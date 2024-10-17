@@ -1,0 +1,12 @@
+{
+  "name": "checkmate",
+  "version": "1.0.0",
+  "description": "a personal relationship management app that helps users stay connected by generating custom check-in schedules, sending reminders, and tracking conversations and follow-up actions with their important contacts.",
+  "main": "emain.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Joshua Nwogu",
+  "license": "ISC"
+}
