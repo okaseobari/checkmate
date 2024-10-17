@@ -1,6 +1,6 @@
 import { RELATIONSHIP_TYPES } from "./constants.js";
 
-export class Schedule {
+export default class Schedule {
     constructor() {
         this.contacts = []; // Store the contacts
         this.schedule = []; // Store the generated schedule
@@ -74,12 +74,27 @@ export class Schedule {
         return this.schedule; // Return the sorted schedule
     }
 
+    //TODO remove this when date picker is added
+    // Helper function to format a date as YYYY-MM-DD
+    formatDate(date) {
+        // Check if the passed value is already a Date object, if not, try to convert it to a Date
+        const validDate = (date instanceof Date) ? date : new Date(date);
+
+        // Check if the date is valid
+        if (!isNaN(validDate)) {
+            return validDate.toISOString().split('T')[0];
+        } else {
+            console.error("Invalid date provided:", date);
+            return null;
+        }
+    }
+
      // Schedule a birthday check-in if the birthday falls within the time period
      scheduleBirthdayCheckIn(contact, startDate, totalDays, checkInsPerDay) {
-        const birthday = new Date(contact.birthday);
-        const birthdayThisYear = new Date(startDate.getFullYear(), birthday.getMonth(), birthday.getDate());
+        const birthday = this.formatDate(contact.birthday);
+        const birthdayThisYear = new Date(Date.UTC(startDate.getUTCFullYear(), new Date(birthday).getUTCMonth(), new Date(birthday).getUTCDate()));
         const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + totalDays);
+        endDate.setUTCDate(startDate.getUTCDate() + totalDays);
 
         // Ensure birthday is within the time period
         if (birthdayThisYear >= startDate && birthdayThisYear <= endDate) {

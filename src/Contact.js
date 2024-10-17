@@ -1,6 +1,6 @@
 import { RELATIONSHIP_TYPES } from "./constants.js";
 
-export class Contact {
+export default class Contact {
     constructor(name, relationship, startDate = new Date(), lastContacted = null, whatWeTalkedAbout = [], followUpItems = [], adjustableWeight = 1, birthday = null) {
         this._name = name;
         this._relationship = relationship;
