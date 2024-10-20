@@ -1,14 +1,14 @@
 import { RELATIONSHIP_TYPES } from "./constants.js";
 
 export default class Contact {
-    constructor(name, relationship, startDate = new Date(), lastContacted = null, whatWeTalkedAbout = [], followUpItems = [], adjustableWeight = 1, birthday = null) {
+    constructor(name, relationship, startDate = new Date(), lastContacted = null, whatWeTalkedAbout = [], followUpItems = [], adjustableWeight = 1, importantEvents = []) {
         this._name = name;
         this._relationship = relationship;
         this._startDate = startDate ? new Date(startDate) : new Date();  // Ensure startDate is always a valid date
         this._lastContacted = lastContacted;
         this._whatWeTalkedAbout = whatWeTalkedAbout;  // List of topics discussed
         this._adjustableWeight = adjustableWeight; // New dial to increase or decrease frequency
-        this._birthday = birthday;
+        this._importantEvents = importantEvents;
     }
 
     // Dynamically calculate the frequency (monthly-based) based on relationship type and the adjustable weight
@@ -51,7 +51,12 @@ export default class Contact {
     get lastContacted() { return this._lastContacted; }
     get whatWeTalkedAbout() { return this._whatWeTalkedAbout; }
     get adjustableWeight() { return this._adjustableWeight; } // Get adjustable weight
-    get birthday() { return this._birthday;} 
+    getEventDate(eventName) {
+        const event = this._importantEvents.find(event => event.eventName === eventName);
+        return event ? event.eventDate : null;
+    }
+    get importantEvents() { return this._importantEvents; }
+
 
     // Setters
     set name(newName) { this._name = newName; }
@@ -60,7 +65,12 @@ export default class Contact {
     set lastContacted(newDate) { this._lastContacted = newDate; }
     set whatWeTalkedAbout(newTopics) { this._whatWeTalkedAbout = newTopics; }
     set adjustableWeight(newWeight) { this._adjustableWeight = newWeight; } // Set adjustable weight
-    set birthday(newBirthday) { this._birthday = new Date(newBirthday); }
+    addImportantEvent(eventName, eventDate) {
+        this._importantEvents.push({ eventName, eventDate });
+    }
+    removeImportantEvent(eventName) {
+        this._importantEvents = this._importantEvents.filter(event => event.eventName !== eventName);
+    }
 
     // Add a new topic to the discussed list
     addWhatWeTalkedAbout(topic) {
