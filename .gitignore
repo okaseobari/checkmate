@@ -26,6 +26,10 @@ coverage
 .vscode/
 .idea/
 
+# expo
+.expo/
+expo-env.d.ts
+
 # Jest coverage
 /coverage
 
