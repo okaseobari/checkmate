@@ -8,6 +8,8 @@ const {
   getUserProfile,
   updateUserProfile,
   getUserSchedule,
+  requestPasswordReset, // Add the new controller for password reset request
+  resetPassword, // Add the new controller for resetting the password
 } = require("../controllers/userController");
 
 // Import middleware for protecting routes (like verifying JWT token)
@@ -18,6 +20,10 @@ userRouter.post("/register", registerUser);
 
 // User login route
 userRouter.post("/login", loginUser);
+
+// Password reset routes
+userRouter.post("/reset-password", requestPasswordReset); // Request password reset
+userRouter.post("/reset-password/:token", resetPassword); // Reset password with token
 
 // Get and update user profile (protected routes, requires authentication)
 userRouter

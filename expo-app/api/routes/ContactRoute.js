@@ -5,7 +5,7 @@ const { protect } = require("../middleware/authMiddleware");
 // Import contact controller functions
 const {
   checkDuplicateName,
-  createContact,
+  addContact,
   deleteContact,
   getAllContacts,
   getContact,
@@ -19,7 +19,7 @@ contactRouter.use(protect);
 contactRouter
   .route("/")
   .get(getAllContacts) // Get all contacts for a user
-  .post(createContact); // Create a new contact for a user
+  .post(addContact); // Create a new contact for a user
 
 // Get, update, or delete a contact by contact ID for a specific user
 contactRouter

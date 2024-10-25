@@ -1,9 +1,9 @@
+import { Controller, useForm } from "react-hook-form";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker"; // Import Picker
 import axios from "axios";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
 import {
   Button,
   FlatList,
@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { Slider } from "react-native-awesome-slider";
 import { useSharedValue } from "react-native-reanimated";
+import axiosInstance from "../app/services/axiosInstance";
 
 export default function AddContactForm() {
   const {
@@ -26,7 +27,7 @@ export default function AddContactForm() {
     clearErrors,
   } = useForm({
     defaultValues: {
-      name: "",
+      name: "Dave",
       adjustableWeight: 1,
       whatWeTalkedAbout: "",
     },
@@ -65,9 +66,7 @@ export default function AddContactForm() {
 
   const checkDuplicateName = async (name) => {
     try {
-      const response = await axios.get(
-        `http://localhost:3000/api/v1/contact/check-duplicate/${name}`
-      );
+      const response = await axiosInstance.get(`/contact/check-duplicate/${name}`);
 
       // If no duplicate is found, the response status will be 200
       if (response.status === 200) {
@@ -81,7 +80,7 @@ export default function AddContactForm() {
           message: error.response.data.message,
         });
       } else {
-        console.error("Error checking duplicate name:", error);
+        console.error("Error checking duplicate name:", JSON.stringify(error));
       }
     }
   };
@@ -91,10 +90,8 @@ export default function AddContactForm() {
     console.log("Contact submitted:", finalData);
 
     try {
-      const response = await axios.post(
-        "http://localhost:3000/api/v1/contact",
-        finalData
-      );
+      const response = await axiosInstance.post("/contact", finalData);
+
       if (response.status === 200) {
         console.log("Contact created successfully:", response.data);
         resetForm();

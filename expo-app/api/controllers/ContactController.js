@@ -14,7 +14,7 @@ const getAllContacts = async (req, res) => {
 };
 
 // Create a new contact and regenerate the user's schedule
-const createContact = async (req, res) => {
+const addContact = async (req, res) => {
   try {
     const userId = req.user._id;
     const { name, relationship, adjustableWeight, importantEvents } = req.body;
@@ -231,7 +231,7 @@ const updateCheckIn = async (req, res) => {
 
 module.exports = {
   checkDuplicateName,
-  createContact,
+  addContact,
   deleteContact,
   getAllContacts,
   getContact,

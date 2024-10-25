@@ -1,6 +1,8 @@
-const User = require("../models/userModel");
+const { randomBytes } = require("node:crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const sendEmail = require("../utils/sendEmail");
+const User = require("../models/userModel");
 
 // Register a new user
 const registerUser = async (req, res) => {
@@ -57,6 +59,8 @@ const loginUser = async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
+
+    console.log("user successfully logged in");
 
     res.status(200).json({
       user,
@@ -179,12 +183,87 @@ const deleteUserScheduleEntry = async (req, res) => {
   }
 };
 
+// Request Password Reset
+const requestPasswordReset = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "No user found with this email." });
+    }
+
+    // Generate reset token and its expiration time
+    const resetToken = randomBytes(32).toString("hex");
+    const resetTokenExpiry = Date.now() + 3600000; // 1 hour from now
+
+    // Save the token and expiry in the user's document
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpiry = resetTokenExpiry;
+    await user.save();
+
+    // Send email with reset token
+    const resetURL = `http://localhost:3000/reset-password/${resetToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: "Password Reset",
+      text: `You requested a password reset. Click this link to reset your password: ${resetURL}`,
+    });
+
+    res.status(200).json({ message: "Password reset email sent." });
+  } catch (error) {
+    console.error("Password reset request error:", error);
+    res.status(500).json({ message: "Server error. Please try again later." });
+  }
+};
+
+// Reset Password with Token
+const resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  try {
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpiry: { $gt: Date.now() }, // Ensure the token hasn't expired
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token." });
+    }
+
+    // Hash the new password before saving
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Update user's password and clear the reset token and expiry
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpiry = undefined;
+
+    await user.save();
+
+    res.status(200).json({
+      message:
+        "Password reset successful. You can now log in with your new password.",
+    });
+  } catch (error) {
+    console.error("Password reset error:", error);
+    res.status(500).json({ message: "Server error. Please try again later." });
+  }
+};
+
 module.exports = {
-  registerUser,
-  loginUser,
+  deleteUserScheduleEntry,
   getUserProfile,
-  updateUserProfile,
   getUserSchedule,
+  loginUser,
+  registerUser,
+  requestPasswordReset,
+  resetPassword,
+  updateUserProfile,
   updateUserSchedule,
-  deleteUserScheduleEntry, // New function to handle schedule entry deletion
 };
