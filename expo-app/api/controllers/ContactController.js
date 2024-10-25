@@ -6,7 +6,7 @@ const { generateSchedule } = require("./ScheduleController"); // Import Schedule
 const getAllContacts = async (req, res) => {
   try {
     const userId = req.user._id;
-    const contacts = await Contact.find({ userId }); // Find all contacts for the user
+    const contacts = await Contact.findOne({ userId }); // Find all contacts for the user
     res.status(200).json(contacts);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -19,38 +19,36 @@ const addContact = async (req, res) => {
     const userId = req.user._id;
     const { name, relationship, adjustableWeight, importantEvents } = req.body;
 
-    // Find the user's contact list
-    let userContactList = await Contact.findOne({ userId });
-    if (!userContactList) {
-      userContactList = await Contact.create({ userId, contacts: [] });
-    }
-
-    // Check if contact with the same name already exists for the user
-    const existingContact = userContactList.contacts.find(
-      (contact) => contact.name === name
+    // Find or create the user's contact list
+    let userContactList = await Contact.findOneAndUpdate(
+      { userId },
+      { $setOnInsert: { userId, contacts: [] } },
+      { new: true, upsert: true }
     );
-    if (existingContact) {
+
+    // Check for duplicate contact name
+    if (userContactList.contacts.some((contact) => contact.name === name)) {
       return res.status(400).json({ message: `You already added ${name}` });
     }
 
-    // Create the new contact
+    // Create and add the new contact
     const newContact = {
       name,
       relationship,
       adjustableWeight,
       importantEvents,
     };
-
-    // Push the new contact into the user's contact list
     userContactList.contacts.push(newContact);
 
     // Save the updated contact list
     await userContactList.save();
 
-    // Regenerate the user's schedule asynchronously (background process)
+    // Regenerate the user's schedule asynchronously
     generateSchedule(userId);
 
-    res.status(201).json(newContact);
+    // Respond with the newly created contact
+    const createdContact = userContactList.contacts.slice(-1)[0];
+    res.status(201).json(createdContact);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

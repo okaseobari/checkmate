@@ -1,9 +1,8 @@
-import { Controller, useForm } from "react-hook-form";
 import { Ionicons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker"; // Import Picker
-import axios from "axios";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { Picker } from "@react-native-picker/picker"; // Import Picker
 import React, { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import {
   Button,
   FlatList,
@@ -15,7 +14,7 @@ import {
 } from "react-native";
 import { Slider } from "react-native-awesome-slider";
 import { useSharedValue } from "react-native-reanimated";
-import axiosInstance from "../app/services/axiosInstance";
+import axiosInstance from "../services/axiosInstance";
 
 export default function AddContactForm() {
   const {
@@ -66,7 +65,9 @@ export default function AddContactForm() {
 
   const checkDuplicateName = async (name) => {
     try {
-      const response = await axiosInstance.get(`/contact/check-duplicate/${name}`);
+      const response = await axiosInstance.get(
+        `/contact/check-duplicate/${name}`
+      );
 
       // If no duplicate is found, the response status will be 200
       if (response.status === 200) {
