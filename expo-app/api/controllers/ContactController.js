@@ -6,7 +6,7 @@ const { generateSchedule } = require("./ScheduleController"); // Import Schedule
 const getAllContacts = async (req, res) => {
   try {
     const userId = req.user._id;
-    const contacts = await Contact.findOne({ userId }); // Find all contacts for the user
+    const contacts = await Contact.find({ userId }); // Fetch all contacts for the user directly
     res.status(200).json(contacts);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -19,36 +19,25 @@ const addContact = async (req, res) => {
     const userId = req.user._id;
     const { name, relationship, adjustableWeight, importantEvents } = req.body;
 
-    // Find or create the user's contact list
-    let userContactList = await Contact.findOneAndUpdate(
-      { userId },
-      { $setOnInsert: { userId, contacts: [] } },
-      { new: true, upsert: true }
-    );
-
     // Check for duplicate contact name
-    if (userContactList.contacts.some((contact) => contact.name === name)) {
+    const existingContact = await Contact.findOne({ userId, name });
+    if (existingContact) {
       return res.status(400).json({ message: `You already added ${name}` });
     }
 
-    // Create and add the new contact
-    const newContact = {
+    // Create and save the new contact
+    const newContact = await Contact.create({
+      userId,
       name,
       relationship,
       adjustableWeight,
       importantEvents,
-    };
-    userContactList.contacts.push(newContact);
-
-    // Save the updated contact list
-    await userContactList.save();
+    });
 
     // Regenerate the user's schedule asynchronously
     generateSchedule(userId);
 
-    // Respond with the newly created contact
-    const createdContact = userContactList.contacts.slice(-1)[0];
-    res.status(201).json(createdContact);
+    res.status(201).json(newContact);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -58,27 +47,14 @@ const addContact = async (req, res) => {
 const getContact = async (req, res) => {
   try {
     const userId = req.user._id;
-    const contactId = req.params.contactId; // Get the contact ID from the route params
+    const contactId = req.params.contactId;
 
-    // Find the user's contact list
-    const userContactList = await Contact.findOne({ userId });
-
-    // If no contact list is found for the user
-    if (!userContactList) {
-      return res.status(404).json({ message: "User has no contacts" });
-    }
-
-    // Find the specific contact by ID in the contacts array
-    const contact = userContactList.contacts.find(
-      (contact) => contact._id.toString() === contactId
-    );
-
-    // If the contact is not found
+    // Fetch the contact by ID and ensure it belongs to the user
+    const contact = await Contact.findOne({ _id: contactId, userId });
     if (!contact) {
       return res.status(404).json({ message: "Contact not found" });
     }
 
-    // Return the contact
     res.status(200).json(contact);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -87,37 +63,24 @@ const getContact = async (req, res) => {
 
 const updateContact = async (req, res) => {
   try {
-    const userId = req.user._id; // Get the user ID from the params
-    const contactId = req.params.contactId; // Get the contact ID from the params
+    const userId = req.user._id;
+    const contactId = req.params.contactId;
 
-    // Find the user's contact list
-    let userContactList = await Contact.findOne({ userId });
-    if (!userContactList) {
-      return res.status(404).json({ message: "User has no contacts" });
-    }
-
-    // Find the specific contact to update
-    const contactIndex = userContactList.contacts.findIndex(
-      (contact) => contact._id.toString() === contactId
+    // Update the contact with the new data and ensure it belongs to the user
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id: contactId, userId },
+      { ...req.body },
+      { new: true }
     );
 
-    if (contactIndex === -1) {
+    if (!updatedContact) {
       return res.status(404).json({ message: "Contact not found" });
     }
 
-    // Update the contact with the new data from the request body
-    userContactList.contacts[contactIndex] = {
-      ...userContactList.contacts[contactIndex]._doc, // Keep existing fields
-      ...req.body, // Update with new fields
-    };
-
-    // Save the updated contact list
-    await userContactList.save();
-
-    // Regenerate the user's schedule asynchronously (background process)
+    // Regenerate the user's schedule asynchronously
     generateSchedule(userId);
 
-    res.status(200).json(userContactList.contacts[contactIndex]);
+    res.status(200).json(updatedContact);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -125,31 +88,20 @@ const updateContact = async (req, res) => {
 
 const deleteContact = async (req, res) => {
   try {
-    const userId = req.user._id; // Get the user ID from the params
-    const contactId = req.params.contactId; // Get the contact ID from the params
+    const userId = req.user._id;
+    const contactId = req.params.contactId;
 
-    // Find the user's contact list
-    let userContactList = await Contact.findOne({ userId });
-    if (!userContactList) {
-      return res.status(404).json({ message: "User has no contacts" });
-    }
+    // Remove the contact and ensure it belongs to the user
+    const deletedContact = await Contact.findOneAndDelete({
+      _id: contactId,
+      userId,
+    });
 
-    // Find the specific contact to delete
-    const contactIndex = userContactList.contacts.findIndex(
-      (contact) => contact._id.toString() === contactId
-    );
-
-    if (contactIndex === -1) {
+    if (!deletedContact) {
       return res.status(404).json({ message: "Contact not found" });
     }
 
-    // Remove the contact from the list
-    userContactList.contacts.splice(contactIndex, 1);
-
-    // Save the updated contact list
-    await userContactList.save();
-
-    // Regenerate the user's schedule asynchronously (background process)
+    // Regenerate the user's schedule asynchronously
     generateSchedule(userId);
 
     res.status(200).json({ message: "Contact deleted successfully" });
@@ -163,25 +115,16 @@ const checkDuplicateName = async (req, res) => {
     const { name } = req.params;
     const userId = req.user._id;
 
-    // Find the user's contact list
-    const userContactList = await Contact.findOne({ userId });
+    // Check for duplicate name within the user's contacts
+    const duplicateContact = await Contact.findOne({
+      userId,
+      name: { $regex: new RegExp(`^${name}$`, "i") },
+    });
 
-    // If no contacts found for the user
-    if (!userContactList) {
-      return res.status(200).json({ message: "Name is available." });
-    }
-
-    // Check if any contact in the list has the same name
-    const duplicateContact = userContactList.contacts.find(
-      (contact) => contact.name.toLowerCase() === name.toLowerCase()
-    );
-
-    // If a contact with the same name is found
     if (duplicateContact) {
       return res.status(400).json({ message: `You already added ${name}` });
     }
 
-    // If no duplicate is found, the name is available
     res.status(200).json({ message: "Name is available." });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -201,21 +144,16 @@ const updateCheckIn = async (req, res) => {
     contact.lastCheckInDate = new Date();
     await contact.save();
 
-    // Add the conversation to the ConversationLog collection
-    const log = await ConversationLog.findOne({ userId, contactId });
-    if (log) {
-      log.conversationHistory.push({
-        date: new Date(),
-        content: whatWeTalkedAbout,
-      });
-      await log.save();
-    } else {
-      await ConversationLog.create({
-        userId,
-        contactId,
-        conversationHistory: [{ date: new Date(), content: whatWeTalkedAbout }],
-      });
-    }
+    // Add conversation to the log
+    const log = await ConversationLog.findOneAndUpdate(
+      { userId, contactId },
+      {
+        $push: {
+          conversationHistory: { date: new Date(), content: whatWeTalkedAbout },
+        },
+      },
+      { upsert: true, new: true }
+    );
 
     res
       .status(200)

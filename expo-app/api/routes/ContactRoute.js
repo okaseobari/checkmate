@@ -15,6 +15,9 @@ const {
 // Protect all routes under this router
 contactRouter.use(protect);
 
+// Route for checking if a contact name is duplicated for a user
+contactRouter.get("/check-duplicate/:name", checkDuplicateName);
+
 // Get all contacts for a user, create a contact
 contactRouter
   .route("/")
@@ -27,8 +30,5 @@ contactRouter
   .get(getContact) // Get a specific contact for a user
   .put(updateContact) // Update a specific contact for a user
   .delete(deleteContact); // Delete a specific contact for a user
-
-// Route for checking if a contact name is duplicated for a user
-contactRouter.get("/check-duplicate/:name", checkDuplicateName);
 
 module.exports = contactRouter;
