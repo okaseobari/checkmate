@@ -12,6 +12,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-, "components/addContactForm.js"  ]
+    "expo-env.d.ts",
+    "components/addContactForm.js",
+    "nativewind-env.d.ts"
+  ]
 }

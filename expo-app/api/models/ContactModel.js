@@ -1,6 +1,11 @@
 const mongoose = require("mongoose");
 
-const contactEntrySchema = new mongoose.Schema({
+const contactSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User", // Link to the User model
+    required: true,
+  },
   name: {
     type: String,
     required: true,
@@ -24,15 +29,6 @@ const contactEntrySchema = new mongoose.Schema({
     type: Date,
     default: null, // Date of the most recent check-in
   },
-});
-
-const contactSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // References the specific user
-    required: true,
-  },
-  contacts: [contactEntrySchema], // Array of contacts related to the user
 });
 
 const Contact = mongoose.model("Contact", contactSchema);

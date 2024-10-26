@@ -6,10 +6,10 @@ const getUserSchedule = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Find the schedule and populate the contactId with the name field from the Contact collection
+    // Find the schedule and populate the contactId with the name field
     const schedule = await Schedule.findOne({ userId }).populate({
-      path: "entries.contactId", // Path to populate
-      select: "name", // Select only the name field from the Contact model
+      path: "entries.contactId", // Populate contactId in each entry
+      select: "name", // Only get the name field from Contact
     });
 
     if (!schedule) {
@@ -129,22 +129,22 @@ const deleteCheckIn = async (req, res) => {
 
 const generateSchedule = async (userId) => {
   try {
-    // Find the user's contact list
-    const contacts = await Contact.findOne({ userId });
-    if (!contacts) throw new Error("Contacts not found");
+    // Fetch all individual contacts for the user
+    const contacts = await Contact.find({ userId });
+    if (!contacts.length) throw new Error("No contacts found for this user.");
 
-    // Clear existing schedule
+    // Clear the user's existing schedule
     const schedule = await Schedule.findOneAndUpdate(
       { userId },
       { entries: [] },
       { new: true, upsert: true }
     );
 
-    // Logic to regenerate the schedule based on contacts, weights, and important events
-    contacts.contacts.forEach((contact) => {
-      const baseCheckInDate = new Date(); // Starting point for scheduling
+    // Iterate over each contact and create check-ins
+    contacts.forEach((contact) => {
+      const baseCheckInDate = new Date();
 
-      // Schedule check-ins based on relationship and adjustable weight
+      // Determine number of check-ins based on contact details
       const numberOfCheckIns = getCheckInFrequency(
         contact.relationship,
         contact.adjustableWeight
@@ -162,19 +162,18 @@ const generateSchedule = async (userId) => {
         });
       }
 
-      // Handle important events (e.g., birthday, surgery)
+      // Include important events as scheduled entries
       contact.importantEvents.forEach((event) => {
         schedule.entries.push({
-          contactId: contact._id, // Make sure contact._id is used here as well
+          contactId: contact._id,
           checkInDate: event.eventDate,
           event: event.eventName,
         });
       });
     });
 
-    // Save updated user schedule
     await schedule.save();
-    return schedule.entries; // Return the regenerated schedule
+    return schedule.entries;
   } catch (error) {
     throw new Error("Error regenerating schedule: " + error.message);
   }

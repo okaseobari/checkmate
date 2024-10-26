@@ -5,7 +5,6 @@ import React, { useState } from "react";
 import {
   Alert,
   Button,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -66,11 +65,11 @@ const LoginScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Login</Text>
-      {error && <Text style={styles.error}>{error}</Text>}
+    <View className="flex-1 justify-center p-5">
+      <Text className="text-2xl font-bold mb-5 text-center">Login</Text>
+      {error && <Text className="text-red-500 mb-3 text-center">{error}</Text>}
       <TextInput
-        style={styles.input}
+        className="h-10 border border-gray-300 rounded mb-3 px-3"
         placeholder="Email"
         value={email}
         onChangeText={(text) => setEmail(text)}
@@ -78,7 +77,7 @@ const LoginScreen = () => {
         autoCapitalize="none"
       />
       <TextInput
-        style={styles.input}
+        className="h-10 border border-gray-300 rounded mb-3 px-3"
         placeholder="Password"
         value={password}
         onChangeText={(text) => setPassword(text)}
@@ -89,49 +88,14 @@ const LoginScreen = () => {
       <TouchableOpacity
         onPress={handlePasswordReset}
         disabled={isResetting}
-        style={styles.forgotButton}
+        className="mt-4 items-center"
       >
-        <Text style={styles.forgotText}>
+        <Text className="text-blue-500 underline">
           {isResetting ? "Sending..." : "Forgot Password?"}
         </Text>
       </TouchableOpacity>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 20,
-  },
-  heading: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  input: {
-    height: 40,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    marginBottom: 12,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-  },
-  error: {
-    color: "red",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  forgotButton: {
-    marginTop: 15,
-    alignItems: "center",
-  },
-  forgotText: {
-    color: "#007BFF",
-    textDecorationLine: "underline",
-  },
-});
 
 export default LoginScreen;
