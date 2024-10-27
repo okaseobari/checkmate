@@ -36,3 +36,6 @@ coverage
 *.tmp
 *.swp
 *.swo
+
+expo-app/ios
+ios
