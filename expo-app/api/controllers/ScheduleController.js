@@ -1,125 +1,192 @@
-const Schedule = require("../models/ScheduleModel");
+const ScheduleCollection = require("../models/ScheduleModel");
 const Contact = require("../models/ContactModel");
+const ScheduleLogic = require("../services/ScheduleLogic");
+const User = require("../models/UserModel");
 
-// Get the schedule for a specific user, including the contact's name
+// Retrieve the user's schedule, including contact names
 const getUserSchedule = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Find the schedule and populate the contactId with the name field
-    const schedule = await Schedule.findOne({ userId }).populate({
-      path: "entries.contactId", // Populate contactId in each entry
-      select: "name", // Only get the name field from Contact
+    const schedule = await ScheduleCollection.findOne({ userId }).populate({
+      path: "entries.contactId",
+      select: "name",
     });
 
-    if (!schedule) {
+    if (!schedule)
       return res
         .status(404)
         .json({ message: "Schedule not found for this user." });
-    }
 
-    res.status(200).json(schedule.entries); // The entries will now include the contact name
+    res.status(200).json(schedule.entries);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Regenerate the schedule for a specific user (dedicated endpoint)
+// Regenerate the user's schedule
 const regenerateSchedule = async (req, res) => {
   try {
-    const userId = req.user._id; // Get the user ID from the token
-
-    // Regenerate the schedule
+    const userId = req.user._id;
     const newSchedule = await generateSchedule(userId);
-
-    // Return the new schedule
     res.status(200).json(newSchedule);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Helper function to get check-in frequency based on relationship and weight
-const getCheckInFrequency = (relationship, adjustableWeight) => {
-  const baseFrequency = {
-    Family: 4, // Weekly
-    Friend: 2, // Twice a month
-    Acquaintance: 1, // Once a month
-    Girlfriend: 3, // Custom or flexible
-  };
-  return Math.ceil(baseFrequency[relationship] * adjustableWeight);
+// Generate the schedule for a user based on user settings and contacts
+const generateSchedule = async (userId) => {
+  try {
+    // Fetch user and contacts concurrently
+    const [contacts, user] = await Promise.all([
+      Contact.find({ userId }),
+      User.findById(userId),
+    ]);
+
+    // Check if data was found
+    if (!contacts.length) throw new Error("No contacts found for this user.");
+    if (!user) throw new Error("User not found.");
+
+    // Extract user settings
+    const userSettings = user.checkInSettings;
+
+    // Initialize ScheduleLogic instance with user settings and add contacts
+    const scheduleInstance = new ScheduleLogic(userSettings, contacts);
+
+    // Generate new schedule entries based on the contacts and user settings
+    const newEntries = createScheduleEntries(scheduleInstance);
+
+    // Sort new entries before storing them
+    newEntries.sort(
+      (a, b) => new Date(a.checkInDate) - new Date(b.checkInDate)
+    );
+
+    // Fetch the user's existing schedule or create a new one
+    const existingSchedule = await getOrCreateSchedule(userId);
+
+    // Clean up entries from deleted contacts and merge new entries
+    const updatedEntries = mergeAndUpdateEntries(
+      existingSchedule.entries,
+      newEntries,
+      contacts
+    );
+
+    // Save the sorted schedule entries directly
+    existingSchedule.entries = updatedEntries;
+    await existingSchedule.save();
+
+    return existingSchedule.entries;
+  } catch (error) {
+    throw new Error(`Error regenerating schedule: ${error.message}`);
+  }
+};
+
+// Helper function to create schedule entries from the schedule logic instance
+const createScheduleEntries = (scheduleInstance) => {
+  return scheduleInstance.generate().map((entry) => ({
+    contactId: entry.contactId,
+    checkInDate: new Date(entry.date),
+    event: entry.note || "General Check-in",
+  }));
+};
+
+// Helper function to fetch or create the schedule for the user
+const getOrCreateSchedule = async (userId) => {
+  return await ScheduleCollection.findOneAndUpdate(
+    { userId },
+    { $setOnInsert: { userId, entries: [] } },
+    { new: true, upsert: true }
+  );
+};
+
+// Helper function to merge and update schedule entries
+const mergeAndUpdateEntries = (existingEntries, newEntries, contacts) => {
+  // Map existing entries by contactId and date for quick lookup
+  const existingEntriesMap = new Map(
+    existingEntries.map((entry) => [
+      `${entry.contactId}-${entry.checkInDate.toISOString()}`,
+      entry,
+    ])
+  );
+
+  // Filter and update entries
+  newEntries.forEach((newEntry) => {
+    const key = `${newEntry.contactId}-${newEntry.checkInDate.toISOString()}`;
+    if (existingEntriesMap.has(key)) {
+      // Update the event if it differs
+      const existingEntry = existingEntriesMap.get(key);
+      if (existingEntry.event !== newEntry.event) {
+        existingEntry.event = newEntry.event;
+      }
+    } else {
+      // Add new entries if they don’t exist
+      existingEntriesMap.set(key, newEntry);
+    }
+  });
+
+  return Array.from(existingEntriesMap.values());
 };
 
 // Update a specific check-in by checkInId
 const updateCheckIn = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const checkInId = req.params.checkInId;
+    const { checkInId } = req.params;
     const { checkInDate, event } = req.body;
+    const userId = req.user._id;
 
-    // Validate checkInDate as a proper date
-    const newCheckInDate = new Date(checkInDate);
-    if (isNaN(newCheckInDate.getTime())) {
-      return res
-        .status(400)
-        .json({ message: "Invalid date format for checkInDate." });
+    // Validate the check-in date
+    const newDate = new Date(checkInDate);
+    if (isNaN(newDate)) {
+      return res.status(400).json({ message: "Invalid date format." });
     }
 
-    const schedule = await Schedule.findOne({ userId });
-    if (!schedule) {
-      return res.status(404).json({ message: "Schedule not found." });
-    }
-
-    // Find the specific check-in to update by checkInId
-    const checkInIndex = schedule.entries.findIndex(
-      (checkIn) => checkIn._id.toString() === checkInId
+    // Find and update the specific check-in
+    const schedule = await ScheduleCollection.findOneAndUpdate(
+      { userId, "entries._id": checkInId },
+      {
+        $set: {
+          "entries.$.checkInDate": newDate,
+          "entries.$.event": event || "General Check-in",
+        },
+      },
+      { new: true }
     );
 
-    if (checkInIndex === -1) {
+    if (!schedule) {
       return res.status(404).json({ message: "Check-in not found." });
     }
 
-    // Update check-in details
-    schedule.entries[checkInIndex].event = event || "General Check-in";
-    schedule.entries[checkInIndex].checkInDate = newCheckInDate;
+    // Find the updated check-in entry
+    const updatedCheckIn = schedule.entries.find(
+      (entry) => entry._id.toString() === checkInId
+    );
 
-    // Save updated schedule
-    await schedule.save();
-
-    res.status(200).json(schedule.entries[checkInIndex]);
+    res.status(200).json(updatedCheckIn);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Delete a specific check-in entry using checkInId
+// Delete a specific check-in entry
 const deleteCheckIn = async (req, res) => {
   try {
+    const { checkInId } = req.params;
     const userId = req.user._id;
-    const checkInId = req.params.checkInId;
 
-    const schedule = await Schedule.findOne({ userId });
+    // Find the schedule and attempt to remove the specific check-in
+    const schedule = await ScheduleCollection.findOneAndUpdate(
+      { userId },
+      { $pull: { entries: { _id: checkInId } } },
+      { new: true }
+    );
+
     if (!schedule) {
       return res.status(404).json({ message: "Schedule not found." });
     }
 
-    // Find the index of the check-in to be deleted using checkInId
-    const checkInIndex = schedule.entries.findIndex(
-      (checkIn) => checkIn._id.toString() === checkInId
-    );
-
-    if (checkInIndex === -1) {
-      return res.status(404).json({ message: "Check-in not found." });
-    }
-
-    // Remove the check-in from the user's schedule
-    schedule.entries.splice(checkInIndex, 1);
-
-    // Save the updated schedule
-    await schedule.save();
-
     res.status(200).json({
-      message: "Check-in entry deleted successfully.",
+      message: "Check-in deleted successfully.",
       schedule: schedule.entries,
     });
   } catch (error) {
@@ -127,62 +194,10 @@ const deleteCheckIn = async (req, res) => {
   }
 };
 
-const generateSchedule = async (userId) => {
-  try {
-    // Fetch all individual contacts for the user
-    const contacts = await Contact.find({ userId });
-    if (!contacts.length) throw new Error("No contacts found for this user.");
-
-    // Clear the user's existing schedule
-    const schedule = await Schedule.findOneAndUpdate(
-      { userId },
-      { entries: [] },
-      { new: true, upsert: true }
-    );
-
-    // Iterate over each contact and create check-ins
-    contacts.forEach((contact) => {
-      const baseCheckInDate = new Date();
-
-      // Determine number of check-ins based on contact details
-      const numberOfCheckIns = getCheckInFrequency(
-        contact.relationship,
-        contact.adjustableWeight
-      );
-
-      for (let i = 0; i < numberOfCheckIns; i++) {
-        const checkInDate = new Date(baseCheckInDate);
-        checkInDate.setDate(checkInDate.getDate() + i * 7); // Spread check-ins weekly
-
-        // Ensure contactId is correctly assigned as an ObjectId from Contact
-        schedule.entries.push({
-          contactId: contact._id, // This should be the ObjectId from the Contact model
-          checkInDate,
-          event: "General Check-in",
-        });
-      }
-
-      // Include important events as scheduled entries
-      contact.importantEvents.forEach((event) => {
-        schedule.entries.push({
-          contactId: contact._id,
-          checkInDate: event.eventDate,
-          event: event.eventName,
-        });
-      });
-    });
-
-    await schedule.save();
-    return schedule.entries;
-  } catch (error) {
-    throw new Error("Error regenerating schedule: " + error.message);
-  }
-};
-
 module.exports = {
-  deleteCheckIn,
-  generateSchedule,
   getUserSchedule,
   regenerateSchedule,
+  generateSchedule,
   updateCheckIn,
+  deleteCheckIn,
 };

@@ -165,12 +165,53 @@ const updateCheckIn = async (req, res) => {
   }
 };
 
+const logCheckIn = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { contactId } = req.params;
+    const { checkInDetails } = req.body; // Dynamic input as an object
+
+    const contact = await Contact.findOne({ _id: contactId, userId });
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    // Update the last check-in date
+    contact.lastCheckInDate = new Date();
+    await contact.save();
+
+    // Add the dynamic check-in details to the conversation log
+    await ConversationLog.findOneAndUpdate(
+      { userId, contactId },
+      {
+        $push: {
+          conversationHistory: {
+            date: new Date(),
+            checkInDetails,
+          },
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    // Regenerate the schedule if needed
+    await generateSchedule(userId);
+
+    res
+      .status(200)
+      .json({
+        message: "Check-in logged and conversation updated successfully",
+      });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to log check-in" });
+  }
+};
+
 module.exports = {
-  checkDuplicateName,
   addContact,
+  checkDuplicateName,
   deleteContact,
   getAllContacts,
   getContact,
-  updateContact,
+  logCheckIn,
   updateCheckIn,
+  updateContact,
 };

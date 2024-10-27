@@ -3,24 +3,21 @@ const mongoose = require("mongoose");
 const conversationLogSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true, // Tied to the user
+    ref: 'User',
+    required: true,
   },
   contactId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Contact", // Tied to a specific contact
+    ref: 'Contact',
     required: true,
   },
   conversationHistory: [
     {
-      date: { type: Date, default: Date.now }, // Date of the conversation
-      content: String, // Details of the conversation
+      date: { type: Date, default: Date.now },
+      checkInDetails: { type: Map, of: String }, // Dynamic key-value pairs
     },
   ],
 });
 
-const ConversationLog = mongoose.model(
-  "ConversationLog",
-  conversationLogSchema
-);
+const ConversationLog = mongoose.model("ConversationLog", conversationLogSchema);
 module.exports = ConversationLog;

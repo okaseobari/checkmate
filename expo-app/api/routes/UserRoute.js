@@ -7,9 +7,12 @@ const {
   loginUser,
   getUserProfile,
   updateUserProfile,
-  getUserSchedule,
-  requestPasswordReset, // Add the new controller for password reset request
-  resetPassword, // Add the new controller for resetting the password
+  getUserCheckInSettings,
+  updateUserCheckInSetting,
+  deleteUserCheckInSetting,
+  resetUserCheckInSettings,
+  requestPasswordReset,
+  resetPassword,
 } = require("../controllers/userController");
 
 // Import middleware for protecting routes (like verifying JWT token)
@@ -22,16 +25,26 @@ userRouter.post("/register", registerUser);
 userRouter.post("/login", loginUser);
 
 // Password reset routes
-userRouter.post("/reset-password", requestPasswordReset); // Request password reset
-userRouter.post("/reset-password/:token", resetPassword); // Reset password with token
+userRouter.post("/reset-password", requestPasswordReset);
+userRouter.post("/reset-password/:token", resetPassword);
 
-// Get and update user profile (protected routes, requires authentication)
+// Profile routes (protected)
 userRouter
   .route("/profile")
   .get(protect, getUserProfile) // Get user profile
   .put(protect, updateUserProfile); // Update user profile
 
-// Get user schedule (protected route)
-userRouter.get("/schedule", protect, getUserSchedule);
+// Check-in settings routes (protected)
+userRouter
+  .route("/settings/check-ins")
+  .get(protect, getUserCheckInSettings) // Get check-in settings
+  .put(protect, updateUserCheckInSetting); // Update/add check-in setting
+
+userRouter
+  .route("/settings/check-ins/:relationshipType")
+  .delete(protect, deleteUserCheckInSetting); // Delete check-in setting
+
+// Separate route for resetting check-in settings to defaults (protected)
+userRouter.post("/settings/check-ins/reset", protect, resetUserCheckInSettings); // Reset check-in settings to default
 
 module.exports = userRouter;

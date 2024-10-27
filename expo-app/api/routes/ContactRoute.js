@@ -4,11 +4,12 @@ const { protect } = require("../middleware/authMiddleware");
 
 // Import contact controller functions
 const {
-  checkDuplicateName,
   addContact,
+  checkDuplicateName,
   deleteContact,
   getAllContacts,
   getContact,
+  logCheckIn,
   updateContact,
 } = require("../controllers/ContactController");
 
@@ -30,5 +31,8 @@ contactRouter
   .get(getContact) // Get a specific contact for a user
   .put(updateContact) // Update a specific contact for a user
   .delete(deleteContact); // Delete a specific contact for a user
+
+  // Route for logging a check-in
+contactRouter.put("/:contactId/log-checkin", logCheckIn);
 
 module.exports = contactRouter;
