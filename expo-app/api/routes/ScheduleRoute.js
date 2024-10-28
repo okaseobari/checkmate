@@ -22,7 +22,4 @@ scheduleRouter
   .put(updateCheckIn) // Update a specific check-in for a user
   .delete(deleteCheckIn); // Delete a specific check-in for a user
 
-// Route to log a check-in for a specific contact
-scheduleRouter.route("/log/:contactId").post(logCheckIn); // Log a check-in for a specific contact
-
 module.exports = scheduleRouter;

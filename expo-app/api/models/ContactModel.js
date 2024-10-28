@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const contactSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // Link to the User model
+    ref: "User",
     required: true,
   },
   name: {
@@ -12,12 +12,12 @@ const contactSchema = new mongoose.Schema({
   },
   relationship: {
     type: String,
-    enum: ["Family", "Friend", "Acquaintance", "Girlfriend", "Other"], // Standardize relationship types
-    default: "Other",
+    enum: ["Family", "Friend", "Acquaintance", "Girlfriend", "Other"],
+    default: "Friend",
   },
   adjustableWeight: {
     type: Number,
-    default: 1, // Default weight for scheduling frequency
+    default: 1,
   },
   importantEvents: [
     {
@@ -27,9 +27,49 @@ const contactSchema = new mongoose.Schema({
   ],
   lastCheckInDate: {
     type: Date,
-    default: null, // Date of the most recent check-in
+    default: null,
   },
 });
+
+// Schema methods
+
+// Method to update the last check-in date
+contactSchema.methods.updateLastCheckInDate = async function () {
+  this.lastCheckInDate = new Date();
+  return this.save();
+};
+
+// Method to check if a contact with the same name already exists for a user
+contactSchema.statics.isDuplicateName = async function (userId, name) {
+  const duplicate = await this.findOne({
+    userId,
+    name: { $regex: new RegExp(`^${name}$`, "i") },
+  });
+  return !!duplicate; // Returns true if a duplicate is found, false otherwise
+};
+
+// Method to add an important event to a contact
+contactSchema.methods.addImportantEvent = async function (
+  eventName,
+  eventDate
+) {
+  this.importantEvents.push({ eventName, eventDate });
+  return this.save();
+};
+
+// Method to remove an important event by name
+contactSchema.methods.removeImportantEvent = async function (eventName) {
+  this.importantEvents = this.importantEvents.filter(
+    (event) => event.eventName !== eventName
+  );
+  return this.save();
+};
+
+// Method to update a contact’s details
+contactSchema.methods.updateContactDetails = async function (updateData) {
+  Object.assign(this, updateData);
+  return this.save();
+};
 
 const Contact = mongoose.model("Contact", contactSchema);
 module.exports = Contact;

@@ -1,5 +1,4 @@
 const Contact = require("../models/ContactModel");
-const ConversationLog = require("../models/ConversationLogModel");
 const Schedule = require("../models/ScheduleModel");
 const ScheduleLogic = require("../services/ScheduleLogic");
 const User = require("../models/UserModel");
@@ -51,9 +50,15 @@ const generateSchedule = async (userId) => {
 
     if (!user) throw new Error("User not found.");
 
-    // If no contacts, return an empty schedule
+    // Fetch or create the user's schedule using the schema method
+    const schedule = await Schedule.findOrCreateSchedule(userId);
+
+    // If no contacts, clear the schedule
     if (!contacts.length) {
-      return [];
+      console.log("No contacts found, clearing schedule");
+      schedule.entries = []; // Clear the entries
+      await schedule.save(); // Save the changes
+      return schedule.entries;
     }
 
     const userSettings = user.checkInSettings;
@@ -62,8 +67,17 @@ const generateSchedule = async (userId) => {
     // Generate new schedule entries
     const newEntries = createScheduleEntries(scheduleInstance);
 
-    // Fetch or create the user's schedule using the schema method
-    const schedule = await Schedule.findOrCreateSchedule(userId);
+    // Filter out entries that reference contacts no longer present
+    const validContactIds = new Set(
+      contacts.map((contact) => contact._id.toString())
+    );
+    schedule.entries = schedule.entries.filter((entry) =>
+      validContactIds.has(entry.contactId.toString())
+    );
+
+    console.log(newEntries);
+    console.log("--------------------");
+    console.log(schedule);
 
     // Add or update schedule entries using the schema method
     await schedule.addOrUpdateEntries(newEntries);
@@ -148,41 +162,10 @@ const deleteCheckIn = async (req, res) => {
   }
 };
 
-// Log that a user has checked in with a contact
-const logCheckIn = async (req, res) => {
-  const userId = req.user._id;
-  const { contactId } = req.params;
-  const { checkInDetails } = req.body;
-
-  try {
-    // Atomically update the lastCheckInDate of the contact and validate existence
-    const contact = await Contact.findOneAndUpdate(
-      { _id: contactId, userId },
-      { $set: { lastCheckInDate: new Date() } },
-      { new: true }
-    );
-
-    if (!contact) {
-      return res.status(404).json({ message: "Contact not found." });
-    }
-
-    // Find or create the conversation log for the user and contact
-    const log = await ConversationLog.findOrCreateLog(userId, contactId);
-
-    // Add the check-in details to the conversation log using the schema method
-    await log.addConversation(checkInDetails);
-
-    res.status(201).json({ message: "Check-in logged successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
 module.exports = {
   deleteCheckIn,
   generateSchedule,
   getUserSchedule,
-  logCheckIn,
   regenerateSchedule,
   updateCheckIn,
 };

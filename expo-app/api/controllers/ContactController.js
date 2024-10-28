@@ -1,12 +1,12 @@
 const Contact = require("../models/ContactModel");
 const ConversationLog = require("../models/ConversationLogModel");
-const { generateSchedule } = require("./ScheduleController"); // Import ScheduleController
+const { generateSchedule } = require("./ScheduleController");
 
 // Get all contacts for a specific user
 const getAllContacts = async (req, res) => {
   try {
     const userId = req.user._id;
-    const contacts = await Contact.find({ userId }); // Fetch all contacts for the user directly
+    const contacts = await Contact.find({ userId });
     res.status(200).json(contacts);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -19,9 +19,9 @@ const addContact = async (req, res) => {
     const userId = req.user._id;
     const { name, relationship, adjustableWeight, importantEvents } = req.body;
 
-    // Check for duplicate contact name
-    const existingContact = await Contact.findOne({ userId, name });
-    if (existingContact) {
+    // Check for duplicate contact name using the schema method
+    const isDuplicate = await Contact.isDuplicateName(userId, name);
+    if (isDuplicate) {
       return res.status(400).json({ message: `You already added ${name}` });
     }
 
@@ -61,21 +61,19 @@ const getContact = async (req, res) => {
   }
 };
 
+// Update a contact's details and regenerate the schedule
 const updateContact = async (req, res) => {
   try {
     const userId = req.user._id;
     const contactId = req.params.contactId;
 
-    // Update the contact with the new data and ensure it belongs to the user
-    const updatedContact = await Contact.findOneAndUpdate(
-      { _id: contactId, userId },
-      { ...req.body },
-      { new: true }
-    );
-
-    if (!updatedContact) {
+    const contact = await Contact.findOne({ _id: contactId, userId });
+    if (!contact) {
       return res.status(404).json({ message: "Contact not found" });
     }
+
+    // Update contact details using the schema method
+    const updatedContact = await contact.updateContactDetails(req.body);
 
     // Regenerate the user's schedule asynchronously
     generateSchedule(userId);
@@ -86,22 +84,19 @@ const updateContact = async (req, res) => {
   }
 };
 
+// Delete a contact and regenerate the schedule
 const deleteContact = async (req, res) => {
   try {
     const userId = req.user._id;
     const contactId = req.params.contactId;
 
-    // Remove the contact and ensure it belongs to the user
-    const deletedContact = await Contact.findOneAndDelete({
-      _id: contactId,
-      userId,
-    });
+    // Find and delete the contact directly
+    const contact = await Contact.findOneAndDelete({ _id: contactId, userId });
 
-    if (!deletedContact) {
+    if (!contact) {
       return res.status(404).json({ message: "Contact not found" });
     }
 
-    // Regenerate the user's schedule asynchronously
     generateSchedule(userId);
 
     res.status(200).json({ message: "Contact deleted successfully" });
@@ -110,18 +105,15 @@ const deleteContact = async (req, res) => {
   }
 };
 
+// Check if a name is already used for a contact
 const checkDuplicateName = async (req, res) => {
   try {
     const { name } = req.params;
     const userId = req.user._id;
 
     // Check for duplicate name within the user's contacts
-    const duplicateContact = await Contact.findOne({
-      userId,
-      name: { $regex: new RegExp(`^${name}$`, "i") },
-    });
-
-    if (duplicateContact) {
+    const isDuplicate = await Contact.isDuplicateName(userId, name);
+    if (isDuplicate) {
       return res.status(400).json({ message: `You already added ${name}` });
     }
 
@@ -131,7 +123,35 @@ const checkDuplicateName = async (req, res) => {
   }
 };
 
-// Update last check-in date and add a new conversation to the log
+// Log a check-in and add a new conversation to the log
+const logCheckIn = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { contactId } = req.params;
+    const { checkInDetails } = req.body;
+
+    const contact = await Contact.findOne({ _id: contactId, userId });
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    // Update the last check-in date using the schema method
+    await contact.updateLastCheckInDate();
+
+    // Add the dynamic check-in details to the conversation log
+    const log = await ConversationLog.findOrCreateLog(userId, contactId);
+    await log.addConversation(checkInDetails);
+
+    // Regenerate the schedule if needed
+    generateSchedule(userId);
+
+    res.status(200).json({
+      message: "Check-in logged and conversation updated successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to log check-in" });
+  }
+};
+
+// Update the check-in date and conversation details
 const updateCheckIn = async (req, res) => {
   try {
     const { contactId, whatWeTalkedAbout } = req.body;
@@ -140,68 +160,20 @@ const updateCheckIn = async (req, res) => {
     const contact = await Contact.findOne({ _id: contactId, userId });
     if (!contact) return res.status(404).json({ message: "Contact not found" });
 
-    // Update last check-in date
-    contact.lastCheckInDate = new Date();
-    await contact.save();
+    // Update the last check-in date using the schema method
+    await contact.updateLastCheckInDate();
 
     // Add conversation to the log
-    const log = await ConversationLog.findOneAndUpdate(
-      { userId, contactId },
-      {
-        $push: {
-          conversationHistory: { date: new Date(), content: whatWeTalkedAbout },
-        },
-      },
-      { upsert: true, new: true }
-    );
+    const log = await ConversationLog.findOrCreateLog(userId, contactId);
+    await log.addConversation({ content: whatWeTalkedAbout });
 
-    res
-      .status(200)
-      .json({ message: "Check-in and conversation updated successfully" });
+    res.status(200).json({
+      message: "Check-in and conversation updated successfully",
+    });
   } catch (error) {
     res
       .status(500)
       .json({ message: "Failed to update check-in and conversation" });
-  }
-};
-
-const logCheckIn = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const { contactId } = req.params;
-    const { checkInDetails } = req.body; // Dynamic input as an object
-
-    const contact = await Contact.findOne({ _id: contactId, userId });
-    if (!contact) return res.status(404).json({ message: "Contact not found" });
-
-    // Update the last check-in date
-    contact.lastCheckInDate = new Date();
-    await contact.save();
-
-    // Add the dynamic check-in details to the conversation log
-    await ConversationLog.findOneAndUpdate(
-      { userId, contactId },
-      {
-        $push: {
-          conversationHistory: {
-            date: new Date(),
-            checkInDetails,
-          },
-        },
-      },
-      { upsert: true, new: true }
-    );
-
-    // Regenerate the schedule if needed
-    await generateSchedule(userId);
-
-    res
-      .status(200)
-      .json({
-        message: "Check-in logged and conversation updated successfully",
-      });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to log check-in" });
   }
 };
 
