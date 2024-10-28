@@ -1,6 +1,13 @@
 const ScheduleLogic = require("../services/ScheduleLogic");
 const { RELATIONSHIP_TYPES } = require("../utils/constants");
 
+formatDateToLocal = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 describe("Schedule Logic Tests", () => {
   let scheduleManager;
   let userSettings;
@@ -44,7 +51,7 @@ describe("Schedule Logic Tests", () => {
     scheduleManager.addContact(contact);
     const generatedSchedule = scheduleManager.generate();
 
-    const formattedEventDate = eventDate1.toISOString().split("T")[0];
+    const formattedEventDate = formatDateToLocal(eventDate1);
     const birthdayCheckIn = generatedSchedule.find(
       (checkIn) =>
         checkIn.date === formattedEventDate &&
@@ -96,7 +103,6 @@ describe("Schedule Logic Tests", () => {
     const contact = {
       name: "David",
       relationship: RELATIONSHIP_TYPES.FRIEND,
-      eligibleDays: ["Monday", "Tuesday", "Wednesday"],
     };
     scheduleManager.addContact(contact);
     const generatedSchedule = scheduleManager.generate();
@@ -153,7 +159,6 @@ describe("Schedule Logic Tests", () => {
     const contact = {
       _id: 4,
       adjustableWeight: 1,
-      eligibleDays: ["Monday", "Tuesday"],
       importantEvents: [{ eventName: "Anniversary", eventDate: eventDate1 }],
       name: "Jake",
       relationship: RELATIONSHIP_TYPES.FRIEND,
@@ -162,7 +167,7 @@ describe("Schedule Logic Tests", () => {
     scheduleManager.addContact(contact);
     const generatedSchedule = scheduleManager.generate();
 
-    const formattedEventDate = eventDate1.toISOString().split("T")[0];
+    const formattedEventDate = formatDateToLocal(eventDate1)
     const anniversaryCheckIn = generatedSchedule.find(
       (checkIn) =>
         checkIn.date === formattedEventDate &&
@@ -173,135 +178,94 @@ describe("Schedule Logic Tests", () => {
     expect(anniversaryCheckIn.name).toBe("Jake");
   });
 
-  test("handles adjustable weight and limits frequency based on available days", () => {
-    // Define a contact of type ACQUAINTANCE with an adjustable weight
+  test("handles bidirectional weight adjustments for the same relationship type", () => {
     const contact = {
-      _id: "5",
-      adjustableWeight: 3,
-      name: "Tom",
-      relationship: RELATIONSHIP_TYPES.ACQUAINTANCE,
+      _id: "9",
+      name: "Emma",
+      relationship: RELATIONSHIP_TYPES.FAMILY,
+      adjustableWeight: 1,
     };
 
-    // Add the contact to the schedule manager
     scheduleManager.addContact(contact);
 
-    // Generate the schedule
-    const generatedSchedule = scheduleManager.generate();
-
-    // Filter the schedule to find check-ins for Tom
-    const tomCheckIns = generatedSchedule.filter(
-      (checkIn) => checkIn.name === "Tom"
-    );
-
-    // Retrieve the user setting for the ACQUAINTANCE relationship type
+    // Initial schedule and check-ins
     const setting = userSettings.find(
       (s) => s.relationshipType === contact.relationship
     );
-    const baseFrequency = setting.occurrencesPerMonth;
-    const eligibleDays = setting.eligibleDays;
-
-    // Count the total eligible days across the remaining current month and next month
-    const totalEligibleDays = countEligibleDaysAcrossMonths(
-      eligibleDays,
+    const totalEligibleDays = scheduleManager.countEligibleDaysAcrossMonths(
+      setting.eligibleDays,
       new Date()
     );
 
-    // Calculate the expected check-ins based on the base frequency and adjustable weight
-    const maxCheckIns = baseFrequency * contact.adjustableWeight;
-    const expectedCheckIns = Math.min(maxCheckIns, totalEligibleDays);
+    // Adjust weights and validate schedule updates
+    scheduleManager.updateContact("Emma", { adjustableWeight: 2 });
+    const updatedSchedule = scheduleManager.getSchedule();
+    const increasedCheckIns = updatedSchedule.filter(
+      (checkIn) => checkIn.name === "Emma"
+    );
 
-    // Validate that the number of check-ins matches the expected frequency
-    expect(tomCheckIns.length).toBe(expectedCheckIns);
+    const increasedExpectedCheckIns = Math.min(
+      setting.occurrencesPerMonth * 2,
+      totalEligibleDays
+    );
 
-    // Validate that each check-in occurs on an eligible day based on user settings
-    tomCheckIns.forEach((checkIn) => {
+    expect(increasedCheckIns.length).toBe(increasedExpectedCheckIns);
+
+    scheduleManager.updateContact("Emma", { adjustableWeight: 0.5 });
+    const decreasedCheckIns = scheduleManager
+      .getSchedule()
+      .filter((checkIn) => checkIn.name === "Emma");
+
+    const decreasedExpectedCheckIns = Math.min(
+      setting.occurrencesPerMonth * 0.5,
+      totalEligibleDays
+    );
+
+    expect(decreasedCheckIns.length).toBe(decreasedExpectedCheckIns);
+  });
+
+  test("updates contact details and affects the schedule correctly", () => {
+    const contact = {
+      _id: "8",
+      name: "Alice",
+      relationship: RELATIONSHIP_TYPES.FRIEND,
+      adjustableWeight: 1,
+    };
+
+    scheduleManager.addContact(contact);
+
+    const initialSchedule = scheduleManager.getSchedule();
+    expect(initialSchedule.some((checkIn) => checkIn.name === "Alice")).toBe(
+      true
+    );
+
+    scheduleManager.updateContact("Alice", { name: "Alicia" });
+    const scheduleAfterNameChange = scheduleManager.getSchedule();
+    expect(scheduleAfterNameChange).toEqual(initialSchedule);
+
+    scheduleManager.updateContact("Alicia", {
+      relationship: RELATIONSHIP_TYPES.FAMILY,
+    });
+    const scheduleAfterRelationshipChange = scheduleManager.getSchedule();
+    const newSetting = userSettings.find(
+      (s) => s.relationshipType === RELATIONSHIP_TYPES.FAMILY
+    );
+
+    const expectedCheckIns =
+      newSetting.occurrencesPerMonth * contact.adjustableWeight;
+    const familyCheckIns = scheduleAfterRelationshipChange.filter(
+      (checkIn) => checkIn.name === "Alicia"
+    );
+
+    expect(familyCheckIns.length).toBeLessThanOrEqual(expectedCheckIns);
+
+    familyCheckIns.forEach((checkIn) => {
       const checkInDay = new Date(
         checkIn.date.replace(/-/g, "/").replace(/T.+/, "")
       ).toLocaleString("en-US", {
         weekday: "long",
       });
-      expect(eligibleDays).toContain(checkInDay);
+      expect(newSetting.eligibleDays).toContain(checkInDay);
     });
   });
-
-  test("handles situations with fewer eligible days left in the month and considers the next month", () => {
-    const currentDate = new Date();
-    currentDate.setDate(20);
-
-    const contact = {
-      _id: "7",
-      name: "Sophia",
-      relationship: RELATIONSHIP_TYPES.FAMILY,
-      eligibleDays: ["Saturday"],
-      adjustableWeight: 1,
-    };
-
-    scheduleManager.addContact(contact);
-    const generatedSchedule = scheduleManager.generate();
-
-    const sophiaCheckIns = generatedSchedule.filter(
-      (checkIn) =>
-        checkIn.name === contact.name && new Date(checkIn.date) >= currentDate
-    );
-
-    const remainingSaturdaysCount = countEligibleDaysAcrossMonths(
-      ["Saturday"],
-      currentDate
-    );
-
-    expect(sophiaCheckIns.length).toBeLessThanOrEqual(remainingSaturdaysCount);
-  });
-
-  function countEligibleDaysAcrossMonths(eligibleDays, startDate) {
-    let count = 0;
-    let currentDate = new Date(startDate);
-
-    // Calculate the remaining days in the current month
-    const remainingDaysInCurrentMonth =
-      new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        0
-      ).getDate() -
-      currentDate.getDate() +
-      1;
-
-    // Calculate the total days in the next month
-    const totalDaysInNextMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth() + 2,
-      0
-    ).getDate();
-
-    // Total days to iterate through: remaining days in current month + full next month
-    const totalDays = remainingDaysInCurrentMonth + totalDaysInNextMonth;
-
-    // Iterate through the total number of days
-    for (let i = 0; i < totalDays; i++) {
-      const dayName = currentDate.toLocaleString("en-US", { weekday: "long" });
-
-      // Check if the current day is an eligible day
-      if (eligibleDays.includes(dayName)) {
-        count++;
-      }
-
-      // Move to the next day
-      currentDate.setDate(currentDate.getDate() + 1);
-
-      // Check if we've moved to the next month
-      const daysInNewMonth = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        0
-      ).getDate();
-
-      if (currentDate.getDate() > daysInNewMonth) {
-        // Move to the first day of the next month
-        currentDate.setMonth(currentDate.getMonth() + 1);
-        currentDate.setDate(1);
-      }
-    }
-
-    return count;
-  }
 });

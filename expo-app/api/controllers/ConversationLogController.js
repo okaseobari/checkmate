@@ -4,21 +4,14 @@ const ConversationLog = require("../models/ConversationLogModel");
 const addConversation = async (req, res) => {
   const userId = req.user._id;
   const { contactId } = req.params;
-  const { content } = req.body;
+  const { checkInDetails } = req.body;
 
   try {
-    const log = await ConversationLog.findOne({ userId, contactId });
+    // Find or create the conversation log for the user and contact
+    const log = await ConversationLog.findOrCreateLog(userId, contactId);
 
-    if (log) {
-      log.conversationHistory.push({ content });
-      await log.save();
-    } else {
-      await ConversationLog.create({
-        userId,
-        contactId,
-        conversationHistory: [{ content }],
-      });
-    }
+    // Add a new conversation entry with check-in details
+    await log.addConversation(checkInDetails);
 
     res.status(201).json({ message: "Conversation added" });
   } catch (error) {
@@ -32,7 +25,7 @@ const getConversations = async (req, res) => {
   const { contactId } = req.params;
 
   try {
-    const log = await ConversationLog.findOne({ userId, contactId });
+    const log = await ConversationLog.getLogForContact(userId, contactId);
 
     if (!log) {
       return res.status(404).json({ message: "No conversation history found" });
@@ -49,10 +42,12 @@ const getAllConversations = async (req, res) => {
   const userId = req.user._id;
 
   try {
-    const logs = await ConversationLog.find({ userId });
+    const logs = await ConversationLog.getAllLogsForUser(userId);
 
-    if (logs.length === 0) {
-      return res.status(404).json({ message: "No conversation history found for any contact." });
+    if (!logs.length) {
+      return res
+        .status(404)
+        .json({ message: "No conversation history found for any contact." });
     }
 
     res.status(200).json(logs);
@@ -64,5 +59,5 @@ const getAllConversations = async (req, res) => {
 module.exports = {
   addConversation,
   getConversations,
-  getAllConversations
-}
+  getAllConversations,
+};

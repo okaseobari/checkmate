@@ -1,5 +1,6 @@
-const ScheduleCollection = require("../models/ScheduleModel");
 const Contact = require("../models/ContactModel");
+const ConversationLog = require("../models/ConversationLogModel");
+const Schedule = require("../models/ScheduleModel");
 const ScheduleLogic = require("../services/ScheduleLogic");
 const User = require("../models/UserModel");
 
@@ -8,15 +9,16 @@ const getUserSchedule = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const schedule = await ScheduleCollection.findOne({ userId }).populate({
+    const schedule = await Schedule.findOne({ userId }).populate({
       path: "entries.contactId",
       select: "name",
     });
 
-    if (!schedule)
+    if (!schedule) {
       return res
         .status(404)
         .json({ message: "Schedule not found for this user." });
+    }
 
     res.status(200).json(schedule.entries);
   } catch (error) {
@@ -28,7 +30,10 @@ const getUserSchedule = async (req, res) => {
 const regenerateSchedule = async (req, res) => {
   try {
     const userId = req.user._id;
+
+    // Generate the schedule entries
     const newSchedule = await generateSchedule(userId);
+
     res.status(200).json(newSchedule);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -44,39 +49,26 @@ const generateSchedule = async (userId) => {
       User.findById(userId),
     ]);
 
-    // Check if data was found
-    if (!contacts.length) throw new Error("No contacts found for this user.");
     if (!user) throw new Error("User not found.");
 
-    // Extract user settings
-    const userSettings = user.checkInSettings;
+    // If no contacts, return an empty schedule
+    if (!contacts.length) {
+      return [];
+    }
 
-    // Initialize ScheduleLogic instance with user settings and add contacts
+    const userSettings = user.checkInSettings;
     const scheduleInstance = new ScheduleLogic(userSettings, contacts);
 
-    // Generate new schedule entries based on the contacts and user settings
+    // Generate new schedule entries
     const newEntries = createScheduleEntries(scheduleInstance);
 
-    // Sort new entries before storing them
-    newEntries.sort(
-      (a, b) => new Date(a.checkInDate) - new Date(b.checkInDate)
-    );
+    // Fetch or create the user's schedule using the schema method
+    const schedule = await Schedule.findOrCreateSchedule(userId);
 
-    // Fetch the user's existing schedule or create a new one
-    const existingSchedule = await getOrCreateSchedule(userId);
+    // Add or update schedule entries using the schema method
+    await schedule.addOrUpdateEntries(newEntries);
 
-    // Clean up entries from deleted contacts and merge new entries
-    const updatedEntries = mergeAndUpdateEntries(
-      existingSchedule.entries,
-      newEntries,
-      contacts
-    );
-
-    // Save the sorted schedule entries directly
-    existingSchedule.entries = updatedEntries;
-    await existingSchedule.save();
-
-    return existingSchedule.entries;
+    return schedule.entries;
   } catch (error) {
     throw new Error(`Error regenerating schedule: ${error.message}`);
   }
@@ -89,43 +81,6 @@ const createScheduleEntries = (scheduleInstance) => {
     checkInDate: new Date(entry.date),
     event: entry.note || "General Check-in",
   }));
-};
-
-// Helper function to fetch or create the schedule for the user
-const getOrCreateSchedule = async (userId) => {
-  return await ScheduleCollection.findOneAndUpdate(
-    { userId },
-    { $setOnInsert: { userId, entries: [] } },
-    { new: true, upsert: true }
-  );
-};
-
-// Helper function to merge and update schedule entries
-const mergeAndUpdateEntries = (existingEntries, newEntries, contacts) => {
-  // Map existing entries by contactId and date for quick lookup
-  const existingEntriesMap = new Map(
-    existingEntries.map((entry) => [
-      `${entry.contactId}-${entry.checkInDate.toISOString()}`,
-      entry,
-    ])
-  );
-
-  // Filter and update entries
-  newEntries.forEach((newEntry) => {
-    const key = `${newEntry.contactId}-${newEntry.checkInDate.toISOString()}`;
-    if (existingEntriesMap.has(key)) {
-      // Update the event if it differs
-      const existingEntry = existingEntriesMap.get(key);
-      if (existingEntry.event !== newEntry.event) {
-        existingEntry.event = newEntry.event;
-      }
-    } else {
-      // Add new entries if they don’t exist
-      existingEntriesMap.set(key, newEntry);
-    }
-  });
-
-  return Array.from(existingEntriesMap.values());
 };
 
 // Update a specific check-in by checkInId
@@ -141,8 +96,8 @@ const updateCheckIn = async (req, res) => {
       return res.status(400).json({ message: "Invalid date format." });
     }
 
-    // Find and update the specific check-in
-    const schedule = await ScheduleCollection.findOneAndUpdate(
+    // Find and update the specific check-in using the schema method
+    const schedule = await Schedule.findOneAndUpdate(
       { userId, "entries._id": checkInId },
       {
         $set: {
@@ -157,7 +112,6 @@ const updateCheckIn = async (req, res) => {
       return res.status(404).json({ message: "Check-in not found." });
     }
 
-    // Find the updated check-in entry
     const updatedCheckIn = schedule.entries.find(
       (entry) => entry._id.toString() === checkInId
     );
@@ -174,8 +128,8 @@ const deleteCheckIn = async (req, res) => {
     const { checkInId } = req.params;
     const userId = req.user._id;
 
-    // Find the schedule and attempt to remove the specific check-in
-    const schedule = await ScheduleCollection.findOneAndUpdate(
+    // Find the schedule and remove the specific check-in using the schema method
+    const schedule = await Schedule.findOneAndUpdate(
       { userId },
       { $pull: { entries: { _id: checkInId } } },
       { new: true }
@@ -194,10 +148,41 @@ const deleteCheckIn = async (req, res) => {
   }
 };
 
+// Log that a user has checked in with a contact
+const logCheckIn = async (req, res) => {
+  const userId = req.user._id;
+  const { contactId } = req.params;
+  const { checkInDetails } = req.body;
+
+  try {
+    // Atomically update the lastCheckInDate of the contact and validate existence
+    const contact = await Contact.findOneAndUpdate(
+      { _id: contactId, userId },
+      { $set: { lastCheckInDate: new Date() } },
+      { new: true }
+    );
+
+    if (!contact) {
+      return res.status(404).json({ message: "Contact not found." });
+    }
+
+    // Find or create the conversation log for the user and contact
+    const log = await ConversationLog.findOrCreateLog(userId, contactId);
+
+    // Add the check-in details to the conversation log using the schema method
+    await log.addConversation(checkInDetails);
+
+    res.status(201).json({ message: "Check-in logged successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
-  getUserSchedule,
-  regenerateSchedule,
-  generateSchedule,
-  updateCheckIn,
   deleteCheckIn,
+  generateSchedule,
+  getUserSchedule,
+  logCheckIn,
+  regenerateSchedule,
+  updateCheckIn,
 };

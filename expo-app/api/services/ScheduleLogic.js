@@ -5,6 +5,14 @@ class ScheduleLogic {
     this.userSettings = userSettings;
   }
 
+  refresh() {
+    this.schedule = this.generate();
+  }
+
+  getSchedule() {
+    return this.schedule;
+  }
+
   // Adds multiple contacts and refreshes the schedule once
   setContacts(contacts) {
     this.contacts = contacts;
@@ -95,11 +103,14 @@ class ScheduleLogic {
   // Generates a schedule for all contacts based on the remaining eligible days in the current and next month
   generate() {
     const currentDate = new Date();
-    const remainingDaysCurrentMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth() + 1,
-      0
-    ).getDate() - currentDate.getDate() + 1;
+    const remainingDaysCurrentMonth =
+      new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        0
+      ).getDate() -
+      currentDate.getDate() +
+      1;
     const daysNextMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 2,
@@ -179,7 +190,7 @@ class ScheduleLogic {
       );
 
       if (checkInDate) {
-        const dayKey = checkInDate.toISOString().split("T")[0];
+        const dayKey = this.formatDateToLocal(checkInDate);
         schedule.push({
           contactId: contact._id,
           name: contact.name,
@@ -192,59 +203,66 @@ class ScheduleLogic {
     }
   }
 
+  formatDateToLocal = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Helper function to count eligible days across the current and next month
   countEligibleDaysAcrossMonths(eligibleDays, startDate) {
-      let count = 0;
-      let currentDate = new Date(startDate);
-  
-      // Calculate the remaining days in the current month
-      const remainingDaysInCurrentMonth =
-        new Date(
-          currentDate.getFullYear(),
-          currentDate.getMonth() + 1,
-          0
-        ).getDate() -
-        currentDate.getDate() +
-        1;
-  
-      // Calculate the total days in the next month
-      const totalDaysInNextMonth = new Date(
+    let count = 0;
+    let currentDate = new Date(startDate);
+
+    // Calculate the remaining days in the current month
+    const remainingDaysInCurrentMonth =
+      new Date(
         currentDate.getFullYear(),
-        currentDate.getMonth() + 2,
+        currentDate.getMonth() + 1,
+        0
+      ).getDate() -
+      currentDate.getDate() +
+      1;
+
+    // Calculate the total days in the next month
+    const totalDaysInNextMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 2,
+      0
+    ).getDate();
+
+    // Total days to iterate through: remaining days in current month + full next month
+    const totalDays = remainingDaysInCurrentMonth + totalDaysInNextMonth;
+
+    // Iterate through the total number of days
+    for (let i = 0; i < totalDays; i++) {
+      const dayName = currentDate.toLocaleString("en-US", { weekday: "long" });
+
+      // Check if the current day is an eligible day
+      if (eligibleDays.includes(dayName)) {
+        count++;
+      }
+
+      // Move to the next day
+      currentDate.setDate(currentDate.getDate() + 1);
+
+      // Check if we've moved to the next month
+      const daysInNewMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
         0
       ).getDate();
-  
-      // Total days to iterate through: remaining days in current month + full next month
-      const totalDays = remainingDaysInCurrentMonth + totalDaysInNextMonth;
-  
-      // Iterate through the total number of days
-      for (let i = 0; i < totalDays; i++) {
-        const dayName = currentDate.toLocaleString("en-US", { weekday: "long" });
-  
-        // Check if the current day is an eligible day
-        if (eligibleDays.includes(dayName)) {
-          count++;
-        }
-  
-        // Move to the next day
-        currentDate.setDate(currentDate.getDate() + 1);
-  
-        // Check if we've moved to the next month
-        const daysInNewMonth = new Date(
-          currentDate.getFullYear(),
-          currentDate.getMonth() + 1,
-          0
-        ).getDate();
-  
-        if (currentDate.getDate() > daysInNewMonth) {
-          // Move to the first day of the next month
-          currentDate.setMonth(currentDate.getMonth() + 1);
-          currentDate.setDate(1);
-        }
+
+      if (currentDate.getDate() > daysInNewMonth) {
+        // Move to the first day of the next month
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        currentDate.setDate(1);
       }
-  
-      return count;
     }
+
+    return count;
+  }
 
   // Gets the eligible days for the contact based on user settings
   getEligibleDays(contact) {
@@ -327,16 +345,6 @@ class ScheduleLogic {
       (s) => s.relationshipType === contact.relationship
     );
     return setting ? setting.occurrencesPerMonth : 1;
-  }
-
-  // Refreshes the schedule by recalculating it
-  refresh() {
-    this.schedule = this.generate();
-  }
-
-  // Retrieves the current schedule
-  getSchedule() {
-    return this.schedule;
   }
 }
 
