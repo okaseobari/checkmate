@@ -5,4 +5,4 @@ const RELATIONSHIP_TYPES = {
   GIRLFRIEND: "Girlfriend",
 };
 
-module.exports = { RELATIONSHIP_TYPES };
+export { RELATIONSHIP_TYPES };

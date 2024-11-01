@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 // Schedule Entry Schema (for each check-in for a contact)
 const scheduleEntrySchema = new mongoose.Schema({
@@ -76,4 +76,5 @@ scheduleSchema.methods.removeEntry = async function (entryId) {
 };
 
 const Schedule = mongoose.model("Schedule", scheduleSchema);
-module.exports = Schedule;
+
+export default Schedule;

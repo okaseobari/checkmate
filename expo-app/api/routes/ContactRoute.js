@@ -1,9 +1,5 @@
-const express = require("express");
-const contactRouter = express.Router();
-const { protect } = require("../middleware/authMiddleware");
-
-// Import contact controller functions
-const {
+import express from "express";
+import {
   addContact,
   checkDuplicateName,
   deleteContact,
@@ -11,7 +7,10 @@ const {
   getContact,
   logCheckIn,
   updateContact,
-} = require("../controllers/ContactController");
+} from "../controllers/ContactController.js";
+import { protect } from "../middleware/authMiddleware.js";
+
+const contactRouter = express.Router();
 
 // Protect all routes under this router
 contactRouter.use(protect);
@@ -32,7 +31,7 @@ contactRouter
   .put(updateContact) // Update a specific contact for a user
   .delete(deleteContact); // Delete a specific contact for a user
 
-  // Route for logging a check-in
+// Route for logging a check-in
 contactRouter.put("/:contactId/log-checkin", logCheckIn);
 
-module.exports = contactRouter;
+export default contactRouter;

@@ -1,7 +1,7 @@
-const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-const { RELATIONSHIP_TYPES } = require("../utils/constants");
-const { randomBytes } = require("node:crypto");
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+import { RELATIONSHIP_TYPES } from "../utils/constants.js";
+import { randomBytes } from "node:crypto";
 
 const ALL_DAYS = [
   "Sunday",
@@ -136,4 +136,4 @@ UserSchema.methods.resetCheckInSettings = function () {
 // Check if the model is already compiled to prevent OverwriteModelError
 const User = mongoose.models.User || mongoose.model("User", UserSchema);
 
-module.exports = User;
+export default User;

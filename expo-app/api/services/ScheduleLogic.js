@@ -348,4 +348,4 @@ class ScheduleLogic {
   }
 }
 
-module.exports = ScheduleLogic;
+export default ScheduleLogic;

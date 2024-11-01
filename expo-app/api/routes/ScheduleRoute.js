@@ -1,13 +1,13 @@
-const express = require("express");
-const scheduleRouter = express.Router();
-const {
+import express from "express";
+import {
+  deleteCheckIn,
   getUserSchedule,
   regenerateSchedule,
   updateCheckIn,
-  deleteCheckIn,
-  logCheckIn, // Import the new logCheckIn function
-} = require("../controllers/ScheduleController");
-const { protect } = require("../middleware/authMiddleware");
+} from "../controllers/ScheduleController.js";
+import { protect } from "../middleware/authMiddleware.js";
+
+const scheduleRouter = express.Router();
 
 // Protect all routes under this router
 scheduleRouter.use(protect);
@@ -22,4 +22,4 @@ scheduleRouter
   .put(updateCheckIn) // Update a specific check-in for a user
   .delete(deleteCheckIn); // Delete a specific check-in for a user
 
-module.exports = scheduleRouter;
+export default scheduleRouter;

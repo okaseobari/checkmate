@@ -1,6 +1,6 @@
-const jwt = require("jsonwebtoken");
-const sendEmail = require("../utils/sendEmail");
-const User = require("../models/userModel");
+import jwt from "jsonwebtoken";
+import User from "../models/userModel.js";
+import sendEmail from "../utils/sendEmail.js";
 
 // Register a new user
 const registerUser = async (req, res) => {
@@ -227,7 +227,7 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   registerUser,
   loginUser,
   getUserProfile,

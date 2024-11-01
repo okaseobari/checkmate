@@ -1,7 +1,7 @@
-const Contact = require("../models/ContactModel");
-const Schedule = require("../models/ScheduleModel");
-const ScheduleLogic = require("../services/ScheduleLogic");
-const User = require("../models/UserModel");
+import Contact from "../models/ContactModel.js";
+import Schedule from "../models/ScheduleModel.js";
+import ScheduleLogic from "../services/ScheduleLogic.js";
+import User from "../models/UserModel.js";
 
 // Retrieve the user's schedule, including contact names
 const getUserSchedule = async (req, res) => {
@@ -162,7 +162,7 @@ const deleteCheckIn = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   deleteCheckIn,
   generateSchedule,
   getUserSchedule,

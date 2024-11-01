@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const contactSchema = new mongoose.Schema({
   userId: {
@@ -72,4 +72,5 @@ contactSchema.methods.updateContactDetails = async function (updateData) {
 };
 
 const Contact = mongoose.model("Contact", contactSchema);
-module.exports = Contact;
+
+export default Contact;

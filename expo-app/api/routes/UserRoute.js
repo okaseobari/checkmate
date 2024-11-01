@@ -1,22 +1,19 @@
-const express = require("express");
-const userRouter = express.Router();
-
-// Import the user controller functions
-const {
-  registerUser,
-  loginUser,
-  getUserProfile,
-  updateUserProfile,
-  getUserCheckInSettings,
-  updateUserCheckInSetting,
+import express from "express";
+import {
   deleteUserCheckInSetting,
-  resetUserCheckInSettings,
+  getUserCheckInSettings,
+  getUserProfile,
+  loginUser,
+  registerUser,
   requestPasswordReset,
   resetPassword,
-} = require("../controllers/userController");
+  resetUserCheckInSettings,
+  updateUserCheckInSetting,
+  updateUserProfile,
+} from "../controllers/userController.js";
+import { protect } from "../middleware/authMiddleware.js";
 
-// Import middleware for protecting routes (like verifying JWT token)
-const { protect } = require("../middleware/authMiddleware.js");
+const userRouter = express.Router();
 
 // User registration route
 userRouter.post("/register", registerUser);
@@ -47,4 +44,4 @@ userRouter
 // Separate route for resetting check-in settings to defaults (protected)
 userRouter.post("/settings/check-ins/reset", protect, resetUserCheckInSettings); // Reset check-in settings to default
 
-module.exports = userRouter;
+export default userRouter;
