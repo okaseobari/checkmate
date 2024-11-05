@@ -21,19 +21,15 @@ const LoginScreen = () => {
   const handleLogin = async () => {
     try {
       const response = await axios.post(
-        "http://localhost:3000/api/v1/user/login",
-        {
-          email,
-          password,
-        }
+        "http://10.0.0.206:3000/api/v1/user/login",
+        { email, password },
+        { headers: { "Content-Type": "application/json" } }
       );
 
-      const token = response.data.token;
-
       // Store the token in AsyncStorage
-      await AsyncStorage.setItem("token", token);
+      await AsyncStorage.setItem("token", response.data.token);
 
-      // Navigate to the home screen or dashboard
+      // Navigate to the home screen or dashboard (uncomment when navigation is configured)
       // navigation.navigate('Home');
     } catch (err) {
       setError("Login failed. Please check your credentials.");
@@ -41,14 +37,14 @@ const LoginScreen = () => {
         "Login Error",
         "Login failed. Please check your credentials."
       );
-      console.error("Login error:", err);
+      console.error("Login error:", err.response?.data || err.message);
     }
   };
 
   const handlePasswordReset = async () => {
     try {
-      setIsResetting(true); // Set loading state
-      await axios.post("http://localhost:3000/api/v1/user/reset-password", {
+      setIsResetting(true);
+      await axios.post("http://10.0.0.206:3000/api/v1/user/reset-password", {
         email,
       });
       Alert.alert(
@@ -58,21 +54,21 @@ const LoginScreen = () => {
     } catch (err) {
       setError("Password reset failed. Please try again.");
       Alert.alert("Reset Error", "Password reset failed. Please try again.");
-      console.error("Password reset error:", err);
+      console.error("Password reset error:", err.response?.data || err.message);
     } finally {
-      setIsResetting(false); // Clear loading state
+      setIsResetting(false);
     }
   };
 
   return (
-    <View className="flex-1 justify-center p-5">
+    <View className="flex-1 justify-center p-5 bg-white">
       <Text className="text-2xl font-bold mb-5 text-center">Login</Text>
       {error && <Text className="text-red-500 mb-3 text-center">{error}</Text>}
       <TextInput
         className="h-10 border border-gray-300 rounded mb-3 px-3"
         placeholder="Email"
         value={email}
-        onChangeText={(text) => setEmail(text)}
+        onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
       />
@@ -80,11 +76,10 @@ const LoginScreen = () => {
         className="h-10 border border-gray-300 rounded mb-3 px-3"
         placeholder="Password"
         value={password}
-        onChangeText={(text) => setPassword(text)}
+        onChangeText={setPassword}
         secureTextEntry
       />
       <Button title="Login" onPress={handleLogin} />
-
       <TouchableOpacity
         onPress={handlePasswordReset}
         disabled={isResetting}

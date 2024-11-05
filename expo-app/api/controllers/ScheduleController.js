@@ -71,13 +71,10 @@ const generateSchedule = async (userId) => {
     const validContactIds = new Set(
       contacts.map((contact) => contact._id.toString())
     );
+
     schedule.entries = schedule.entries.filter((entry) =>
       validContactIds.has(entry.contactId.toString())
     );
-
-    console.log(newEntries);
-    console.log("--------------------");
-    console.log(schedule);
 
     // Add or update schedule entries using the schema method
     await schedule.addOrUpdateEntries(newEntries);

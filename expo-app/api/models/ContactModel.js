@@ -33,12 +33,6 @@ const contactSchema = new mongoose.Schema({
 
 // Schema methods
 
-// Method to update the last check-in date
-contactSchema.methods.updateLastCheckInDate = async function () {
-  this.lastCheckInDate = new Date();
-  return this.save();
-};
-
 // Method to check if a contact with the same name already exists for a user
 contactSchema.statics.isDuplicateName = async function (userId, name) {
   const duplicate = await this.findOne({

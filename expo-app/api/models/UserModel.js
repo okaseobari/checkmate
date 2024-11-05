@@ -47,7 +47,7 @@ const monthlyCadenceSchema = new mongoose.Schema({
   eligibleDays: {
     type: [String],
     enum: ALL_DAYS,
-    default: ALL_DAYS, // Default to all days being eligible
+    default: ALL_DAYS,
   },
 });
 
@@ -71,6 +71,10 @@ const UserSchema = new mongoose.Schema({
   checkInSettings: {
     type: [monthlyCadenceSchema],
     default: DEFAULT_CHECKIN_SETTINGS,
+  },
+  pushTokens: {
+    type: [String], // Add this field for Expo push token
+    default: [],
   },
 });
 

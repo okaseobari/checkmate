@@ -1,5 +1,5 @@
 import Contact from "../models/ContactModel.js";
-import ConversationLog from "../models/ConversationLogModel.js";
+import Conversation from "../models/ConversationModel.js";
 import { generateSchedule } from "./ScheduleController.js";
 
 // Get all contacts for a specific user
@@ -96,13 +96,14 @@ const deleteContact = async (req, res) => {
       return res.status(404).json({ message: "Contact not found" });
     }
 
-    // Delete associated conversation logs for the contact
-    await ConversationLog.deleteLogForContact(userId, contactId);
+    await Conversation.deleteOne({ userId, contactId });
 
     // Regenerate the user's schedule asynchronously
     generateSchedule(userId);
 
-    res.status(200).json({ message: "Contact and associated conversations deleted successfully" });
+    res.status(200).json({
+      message: "Contact and associated conversations deleted successfully",
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -132,25 +133,30 @@ const logCheckIn = async (req, res) => {
     const userId = req.user._id;
     const { contactId } = req.params;
     const { checkInDetails } = req.body;
-    const authToken = req.headers.authorization; 
+    const authToken = req.headers.authorization;
 
     const contact = await Contact.findOne({ _id: contactId, userId });
     if (!contact) return res.status(404).json({ message: "Contact not found" });
 
-    // Update the last check-in date using the schema method
-    await contact.updateLastCheckInDate();
+    // Update the last check-in date
+    contact.lastCheckInDate = new Date();
+    await contact.save();
 
-    // Add the dynamic check-in details to the conversation log
-    const log = await ConversationLog.findOrCreateLog(userId, contactId);
-    await log.addConversation(checkInDetails, authToken);
+    let message;
+    if (checkInDetails && Object.keys(checkInDetails).length > 0) {
+      // Add the dynamic check-in details to the conversation log if present
+      const log = await Conversation.findOrCreateLog(userId, contactId);
+      await log.addConversation(checkInDetails, authToken);
+      message =
+        "Check-in logged with conversation details and last check-in date updated successfully.";
+    } else {
+      message =
+        "Check-in date updated successfully without conversation details.";
+    }
 
-    // Regenerate the schedule if needed
-    generateSchedule(userId);
-
-    res.status(200).json({
-      message: "Check-in logged and conversation updated successfully",
-    });
+    res.status(200).json({ message });
   } catch (error) {
+    console.error(`Error logging check-in: ${error.message}`);
     res.status(500).json({ message: "Failed to log check-in" });
   }
 };
@@ -160,7 +166,7 @@ const updateCheckIn = async (req, res) => {
   try {
     const { contactId, checkInDetails } = req.body;
     const userId = req.user._id;
-    const authToken = req.headers.authorization; 
+    const authToken = req.headers.authorization;
 
     const contact = await Contact.findOne({ _id: contactId, userId });
     if (!contact) return res.status(404).json({ message: "Contact not found" });
@@ -169,7 +175,7 @@ const updateCheckIn = async (req, res) => {
     await contact.updateLastCheckInDate();
 
     // Add conversation to the log
-    const log = await ConversationLog.findOrCreateLog(userId, contactId);
+    const log = await Conversation.findOrCreateLog(userId, contactId);
     await log.addConversation(checkInDetails, authToken);
 
     res.status(200).json({

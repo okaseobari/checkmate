@@ -1,22 +1,35 @@
-import React, { useEffect, useState } from "react";
-import {
-  FlatList,
-  Text,
-  View,
-  TouchableOpacity,
-  Alert,
-  SafeAreaView,
-} from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import useStore from "../../store/useStore";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  SafeAreaView,
+  Text,
+  TouchableOpacity,
+  View,
+  RefreshControl,
+} from "react-native";
 import axiosInstance from "../../services/axiosInstance";
+import useStore from "../../store/useStore";
 
 const ScheduleScreen = () => {
-  const { schedule, fetchUserSchedule, loading, setSchedule } = useStore();
+  const { schedule, fetchUserSchedule, loading } = useStore();
   const [selectedCheckIn, setSelectedCheckIn] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchUserSchedule();
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchUserSchedule();
+    } catch (error) {
+      console.error("Error refreshing contacts:", error);
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   // Handle Check-in
@@ -46,7 +59,8 @@ const ScheduleScreen = () => {
   );
 
   return (
-    <SafeAreaView className="flex-1 p-5 pt-12">
+    // TODO: remove bg-white
+    <SafeAreaView className="flex-1 p-5 pt-12 bg-white">
       <Text className="text-2xl font-bold mb-4">Schedule</Text>
       {loading ? (
         <Text className="text-lg text-center">Loading schedule...</Text>
@@ -58,14 +72,17 @@ const ScheduleScreen = () => {
           ListEmptyComponent={
             <Text className="text-center">No scheduled check-ins</Text>
           }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         />
       )}
       {/* Placeholder for logging dialog */}
       {selectedCheckIn && (
-        <ConversationLogDialog
+        <ConversationDialog
           checkIn={selectedCheckIn}
           onClose={() => setSelectedCheckIn(null)}
-          onSave={(conversationLog) => {
+          onSave={(conversation) => {
             // Append the conversation log or update backend as needed
           }}
         />

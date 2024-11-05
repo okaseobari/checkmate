@@ -1,8 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import Constants from "expo-constants";
 
 const axiosInstance = axios.create({
-  baseURL: "http://localhost:3000/api/v1", // Ensure this baseURL is correctly formatted
+  baseURL: Constants.expoConfig?.extra?.API_BASE_URL,
 });
 
 // Add Authorization token to request headers

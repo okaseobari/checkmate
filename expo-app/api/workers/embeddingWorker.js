@@ -1,10 +1,10 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { Worker } from "bullmq";
-import axios from "axios";
 import { redisOptions } from "../config/redisOptions.js";
-import ConversationLog from "../models/ConversationLogModel.js";
+import { Worker } from "bullmq";
+import Conversation from "../models/ConversationModel.js";
+import LLMService from "../services/LLMService.js";
 
 // Helper function to format logs with a consistent style
 const logWithTimestamp = (message, jobId = "") => {
@@ -16,66 +16,42 @@ const logWithTimestamp = (message, jobId = "") => {
 const embeddingWorker = new Worker(
   "embeddingQueue",
   async (job) => {
-    const {
-      contactId,
-      conversationLogId,
-      conversationIndex,
-      conversationHistoryId,
-      authToken,
-    } = job.data;
+    const { conversationId } = job.data;
     logWithTimestamp(
-      `Started processing for conversation log ${conversationLogId}`,
+      `Started processing for conversation ${conversationId}`,
       job.id
     );
 
     try {
-      // Fetch the conversation log
-      const conversationLog = await ConversationLog.findById(conversationLogId);
-      if (!conversationLog) {
-        throw new Error(
-          `ConversationLog with ID ${conversationLogId} not found`
-        );
-      }
+      // Fetch the conversation from the database
+      const conversation = await Conversation.findOne({ _id: conversationId });
 
-      const conversation =
-        conversationLog.conversationHistory[conversationIndex];
       if (!conversation) {
-        throw new Error(`Conversation at index ${conversationIndex} not found`);
+        throw new Error(`Conversation with ID ${conversationId} not found`);
       }
 
-      // Prepare the authorization token
-      const token = authToken.startsWith("Bearer ")
-        ? authToken
-        : `Bearer ${authToken}`;
-
-      // Make the PUT request to generate embeddings
-      const apiUrl = `${process.env.BASE_URL}/conversation-log/generate-embeddings/${contactId}/conversation/${conversationHistoryId}`;
-      const response = await axios.put(
-        apiUrl,
-        {},
-        { headers: { Authorization: token } }
-      );
-
-      // Log the response status and message
-      logWithTimestamp(
-        `API response: ${response.status} ${response.statusText}`,
-        job.id
-      );
-      logWithTimestamp(`API message: ${response.data.message}`, job.id);
-
-      // Validate the response
-      if (response.status !== 200 || !response.data.message) {
-        throw new Error(
-          "Unexpected API response: Embedding generation may not have completed successfully"
+      if (conversation.embeddings && conversation.embeddings.length > 0) {
+        logWithTimestamp(
+          `Embeddings already exist for conversation ${conversationId}`,
+          job.id
         );
+        return;
       }
 
-      // Update conversation to reflect that the embedding generation request was processed
-      conversation.embeddingsGenerated = true;
-      await conversationLog.save();
+      // Prepare the details for embedding generation
+      const formattedDetails = JSON.stringify(conversation.checkInDetails);
+      const embeddings = await LLMService.getEmbeddings(formattedDetails);
+
+      if (!embeddings || embeddings.length === 0) {
+        throw new Error("Failed to generate embeddings");
+      }
+
+      // Save the embeddings to the conversation
+      conversation.embeddings = embeddings;
+      await conversation.save();
 
       logWithTimestamp(
-        `Embedding generation request confirmed for conversation log ${conversationLogId}`,
+        `Embeddings generated and saved successfully for conversation ${conversationId}`,
         job.id
       );
     } catch (error) {
@@ -103,7 +79,7 @@ process.on("SIGTERM", handleShutdown);
 process.on("SIGINT", handleShutdown);
 
 async function handleShutdown() {
-  logWithTimestamp("Shutdown signal received: closing worker");
+  console.log("Shutdown signal received: closing embedding worker...");
   await embeddingWorker.close();
   process.exit(0);
 }
