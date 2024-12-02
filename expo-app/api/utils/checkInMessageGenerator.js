@@ -1,6 +1,6 @@
 import Contact from "../models/ContactModel.js";
 import Conversation from "../models/ConversationModel.js";
-import LLMService from "../services/LLMService.js";
+import { callLLM } from "../services/LLMService.js";
 import { buildPersonalizedMessagePrompt } from "./buildPersonalizedMessagePrompt.js";
 
 /**
@@ -25,13 +25,14 @@ export const generateCheckInNotificationMessage = async (userId, contactId) => {
     }
 
     // Construct the prompt
-    const { notificationPrompt } = buildPersonalizedMessagePrompt(
-      contact,
-      conversations
-    );
+    const { notificationPrompt, fullMessagePrompt } =
+      buildPersonalizedMessagePrompt(contact, conversations);
+
+    const fullMessage = await callLLM(fullMessagePrompt);
+    console.log(fullMessage);
 
     // Call the LLM service
-    const response = await LLMService.callLLM(notificationPrompt);
+    const response = await callLLM(notificationPrompt);
 
     // Process the response to extract header and message
     const [headerLine, messageLine] = response.split("\n").filter(Boolean);

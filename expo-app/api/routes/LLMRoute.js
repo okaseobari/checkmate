@@ -1,8 +1,7 @@
 import express from "express";
 import {
-  getEmbeddings,
-  callLLM,
-  // analyzeText,
+  getEmbeddingsFromLLM,
+  interactWithAgent,
 } from "../controllers/LLMController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -12,12 +11,9 @@ const LLMRouter = express.Router();
 LLMRouter.use(protect);
 
 // Route for generating embeddings from input text
-LLMRouter.post("/get-embeddings", getEmbeddings);
+LLMRouter.post("/get-embeddings", getEmbeddingsFromLLM);
 
 // Route for calling the LLM to generate a response based on input prompt
-LLMRouter.post("/call-llm", callLLM);
-
-// Analyze text
-// LLMRouter.post("/analyzeText", analyzeText);
+LLMRouter.post("/interact", interactWithAgent);
 
 export default LLMRouter;

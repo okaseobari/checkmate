@@ -1,4 +1,4 @@
-class ScheduleLogic {
+class Scheduler {
   constructor(userSettings, contacts = []) {
     this.contacts = contacts;
     this.schedule = [];
@@ -6,7 +6,7 @@ class ScheduleLogic {
   }
 
   refresh() {
-    this.schedule = this.generate();
+    this.schedule = this.generateSchedule();
   }
 
   getSchedule() {
@@ -101,7 +101,7 @@ class ScheduleLogic {
   }
 
   // Generates a schedule for all contacts based on the remaining eligible days in the current and next month
-  generate() {
+  generateSchedule() {
     const currentDate = new Date();
     const remainingDaysCurrentMonth =
       new Date(
@@ -121,7 +121,7 @@ class ScheduleLogic {
     const newSchedule = [];
 
     this.contacts.forEach((contact) => {
-      this.scheduleImportantEvents(
+      this.addImportantEvents(
         contact,
         currentDate,
         totalDays,
@@ -130,7 +130,7 @@ class ScheduleLogic {
     });
 
     this.contacts.forEach((contact) => {
-      this.scheduleGeneralCheckIns(
+      this.addGeneralCheckIns(
         contact,
         currentDate,
         totalDays,
@@ -146,7 +146,7 @@ class ScheduleLogic {
   }
 
   // Helper function to schedule important events for a contact
-  scheduleImportantEvents(contact, currentDate, totalDays, schedule) {
+  addImportantEvents(contact, currentDate, totalDays, schedule) {
     (contact.importantEvents || []).forEach((event) => {
       const eventCheckIn = this.scheduleEventCheckIn(
         contact,
@@ -161,7 +161,7 @@ class ScheduleLogic {
   }
 
   // Helper function to schedule general check-ins for a contact
-  scheduleGeneralCheckIns(
+  addGeneralCheckIns(
     contact,
     currentDate,
     totalDays,
@@ -348,4 +348,4 @@ class ScheduleLogic {
   }
 }
 
-export default ScheduleLogic;
+export default Scheduler;

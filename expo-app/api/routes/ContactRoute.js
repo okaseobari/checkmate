@@ -3,6 +3,7 @@ import {
   addContact,
   checkDuplicateName,
   deleteContact,
+  generateContactInsights,
   getAllContacts,
   getContact,
   logCheckIn,
@@ -33,5 +34,8 @@ contactRouter
 
 // Route for logging a check-in
 contactRouter.put("/:contactId/log-checkin", logCheckIn);
+
+// Route for generating contact insights
+contactRouter.get("/:contactId/insights", generateContactInsights); // Generate insights for a contact
 
 export default contactRouter;

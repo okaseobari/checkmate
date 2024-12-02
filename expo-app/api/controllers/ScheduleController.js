@@ -1,7 +1,7 @@
 import Contact from "../models/ContactModel.js";
 import Schedule from "../models/ScheduleModel.js";
-import ScheduleLogic from "../services/ScheduleLogic.js";
 import User from "../models/UserModel.js";
+import Scheduler from "../services/Scheduler.js";
 
 // Retrieve the user's schedule, including contact names
 const getUserSchedule = async (req, res) => {
@@ -62,10 +62,15 @@ const generateSchedule = async (userId) => {
     }
 
     const userSettings = user.checkInSettings;
-    const scheduleInstance = new ScheduleLogic(userSettings, contacts);
+    const schedulerInstance = new Scheduler(userSettings, contacts);
+    const newSchedule = schedulerInstance.generateSchedule(); // Let the Scheduler generate the schedule
 
-    // Generate new schedule entries
-    const newEntries = createScheduleEntries(scheduleInstance);
+    // Map the scheduler's output to the required format
+    const newEntries = newSchedule.map((entry) => ({
+      contactId: entry.contactId,
+      checkInDate: new Date(entry.date), // Ensure date is a Date object
+      event: entry.note || "General Check-in",
+    }));
 
     // Filter out entries that reference contacts no longer present
     const validContactIds = new Set(
@@ -83,15 +88,6 @@ const generateSchedule = async (userId) => {
   } catch (error) {
     throw new Error(`Error regenerating schedule: ${error.message}`);
   }
-};
-
-// Helper function to create schedule entries from the schedule logic instance
-const createScheduleEntries = (scheduleInstance) => {
-  return scheduleInstance.generate().map((entry) => ({
-    contactId: entry.contactId,
-    checkInDate: new Date(entry.date),
-    event: entry.note || "General Check-in",
-  }));
 };
 
 // Update a specific check-in by checkInId

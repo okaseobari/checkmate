@@ -19,6 +19,10 @@ const contactSchema = new mongoose.Schema({
     type: Number,
     default: 1,
   },
+  birthday: {
+    month: { type: Number, min: 1, max: 12 }, // Month without year
+    day: { type: Number, min: 1, max: 31 },   // Day of the month
+  },
   importantEvents: [
     {
       eventName: { type: String },
@@ -28,6 +32,11 @@ const contactSchema = new mongoose.Schema({
   lastCheckInDate: {
     type: Date,
     default: null,
+  },
+  learnedAttributes: {
+    type: Map,
+    of: String,
+    default: {}
   },
 });
 

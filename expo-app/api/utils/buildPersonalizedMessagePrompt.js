@@ -89,13 +89,13 @@ export const buildPersonalizedMessagePrompt = (contact, conversations) => {
   - **Notification Header**: Under 28 characters.
   - **Notification Message**: Under 100 characters.
 
-  Prioritize referencing recent conversations and upcoming events if space is limited. Include witty, engaging elements like emojis or playful language.
+  Prioritize referencing recent conversations and upcoming events if space is limited. Include witty, engaging elements like emojis or playful language. Ensure that the output is not wrapped in unnecessary quotation marks unless part of the content (e.g., when quoting a phrase).
 
   Example format:
   Notification Header: [Generated Header]
   Notification Message: [Generated Message]
 
-  Ensure the content is attention-grabbing, lighthearted, and encourages the user to reach out without repeating introductory phrases like "Hey" or "It's been a while."
+  Ensure the content is attention-grabbing, lighthearted, and encourages the user to reach out without repeating introductory phrases like 'Hey' or 'It's been a while.'
 `;
 
   return { fullMessagePrompt, notificationPrompt };

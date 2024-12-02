@@ -4,12 +4,12 @@ dotenv.config();
 import { redisOptions } from "../config/redisOptions.js";
 import { Worker } from "bullmq";
 import Conversation from "../models/ConversationModel.js";
-import { getEmbeddings } from "../services/LLMService.js";
+import LLMService from "../services/LLMService.js";
 
 // Helper function to format logs with a consistent style
 const logWithTimestamp = (message, jobId = "") => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] [Worker: embedding] [Job ${jobId}] ${message}`);
+  console.log(`[${timestamp}] [Worker: conversation] [Job ${jobId}] ${message}`);
 };
 
 // Worker to process embedding jobs
@@ -30,25 +30,7 @@ const embeddingWorker = new Worker(
         throw new Error(`Conversation with ID ${conversationId} not found`);
       }
 
-      if (conversation.embeddings && conversation.embeddings.length > 0) {
-        logWithTimestamp(
-          `Embeddings already exist for conversation ${conversationId}`,
-          job.id
-        );
-        return;
-      }
-
-      // Prepare the details for embedding generation
-      const formattedDetails = JSON.stringify(conversation.checkInDetails);
-      const embeddings = await getEmbeddings(formattedDetails);
-
-      if (!embeddings || embeddings.length === 0) {
-        throw new Error("Failed to generate embeddings");
-      }
-
-      // Save the embeddings to the conversation
-      conversation.embeddings = embeddings;
-      await conversation.save();
+   
 
       logWithTimestamp(
         `Embeddings generated and saved successfully for conversation ${conversationId}`,

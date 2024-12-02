@@ -1,11 +1,10 @@
 import jwt from "jsonwebtoken";
 import User from "../models/UserModel.js";
-import sendEmail from "../utils/sendEmail.js";
 
 // Generate JWT token for authentication
 const generateAuthToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: "1d",
+    expiresIn: "300d",
   });
 };
 
@@ -301,16 +300,16 @@ const resetPassword = async (req, res) => {
 };
 
 export {
-  registerUser,
-  loginUser,
-  getUserProfile,
-  updateUserProfile,
   addPushToken,
-  removePushToken,
-  getUserCheckInSettings,
-  updateUserCheckInSetting,
   deleteUserCheckInSetting,
-  resetUserCheckInSettings,
+  getUserCheckInSettings,
+  getUserProfile,
+  loginUser,
+  registerUser,
+  removePushToken,
   requestPasswordReset,
   resetPassword,
+  resetUserCheckInSettings,
+  updateUserCheckInSetting,
+  updateUserProfile,
 };

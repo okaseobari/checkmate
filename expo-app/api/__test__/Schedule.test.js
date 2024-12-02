@@ -1,5 +1,5 @@
-const ScheduleLogic = require("../services/ScheduleLogic");
-const { RELATIONSHIP_TYPES } = require("../utils/constants");
+import Scheduler from "../services/Scheduler";
+import { RELATIONSHIP_TYPES } from "../utils/constants";
 
 formatDateToLocal = (date) => {
   const year = date.getFullYear();
@@ -8,7 +8,7 @@ formatDateToLocal = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-describe("Schedule Logic Tests", () => {
+describe("Scheduler Tests", () => {
   let scheduleManager;
   let userSettings;
 
@@ -31,7 +31,7 @@ describe("Schedule Logic Tests", () => {
       },
     ];
 
-    scheduleManager = new ScheduleLogic(userSettings);
+    scheduleManager = new Scheduler(userSettings);
   });
 
   test("schedules important event check-ins correctly", () => {
@@ -49,7 +49,7 @@ describe("Schedule Logic Tests", () => {
     };
 
     scheduleManager.addContact(contact);
-    const generatedSchedule = scheduleManager.generate();
+    const generatedSchedule = scheduleManager.generateSchedule();
 
     const formattedEventDate = formatDateToLocal(eventDate1);
     const birthdayCheckIn = generatedSchedule.find(
@@ -105,7 +105,7 @@ describe("Schedule Logic Tests", () => {
       relationship: RELATIONSHIP_TYPES.FRIEND,
     };
     scheduleManager.addContact(contact);
-    const generatedSchedule = scheduleManager.generate();
+    const generatedSchedule = scheduleManager.generateSchedule();
 
     const davidCheckIns = generatedSchedule.filter(
       (checkIn) => checkIn.name === "David"
@@ -128,7 +128,7 @@ describe("Schedule Logic Tests", () => {
     };
 
     scheduleManager.addContact(contact);
-    const generatedSchedule = scheduleManager.generate();
+    const generatedSchedule = scheduleManager.generateSchedule();
 
     const setting = userSettings.find(
       (s) => s.relationshipType === contact.relationship
@@ -165,9 +165,9 @@ describe("Schedule Logic Tests", () => {
     };
 
     scheduleManager.addContact(contact);
-    const generatedSchedule = scheduleManager.generate();
+    const generatedSchedule = scheduleManager.generateSchedule();
 
-    const formattedEventDate = formatDateToLocal(eventDate1)
+    const formattedEventDate = formatDateToLocal(eventDate1);
     const anniversaryCheckIn = generatedSchedule.find(
       (checkIn) =>
         checkIn.date === formattedEventDate &&

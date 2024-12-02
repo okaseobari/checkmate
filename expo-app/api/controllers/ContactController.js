@@ -1,5 +1,6 @@
 import Contact from "../models/ContactModel.js";
 import Conversation from "../models/ConversationModel.js";
+import { callLLM } from "../services/LLMService.js";
 import { generateSchedule } from "./ScheduleController.js";
 
 // Get all contacts for a specific user
@@ -17,7 +18,8 @@ const getAllContacts = async (req, res) => {
 const addContact = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { name, relationship, adjustableWeight, importantEvents } = req.body;
+    const { name, relationship, adjustableWeight, importantEvents, birthday } =
+      req.body;
 
     // Check for duplicate contact name using the schema method
     const isDuplicate = await Contact.isDuplicateName(userId, name);
@@ -27,11 +29,12 @@ const addContact = async (req, res) => {
 
     // Create and save the new contact
     const newContact = await Contact.create({
-      userId,
+      adjustableWeight,
+      birthday,
+      importantEvents,
       name,
       relationship,
-      adjustableWeight,
-      importantEvents,
+      userId,
     });
 
     // Regenerate the user's schedule asynchronously
@@ -188,10 +191,106 @@ const updateCheckIn = async (req, res) => {
   }
 };
 
+// Generate personalized insights for a contact
+const generateContactInsights = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { contactId } = req.params;
+
+    // 1. Fetch the contact details
+    const contact = await Contact.findOne({ _id: contactId, userId });
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    // 2. Fetch the conversation history for the contact
+    const conversations = await Conversation.find({ userId, contactId })
+      .select("checkInDetails date -_id")
+      .sort({ date: -1 }); // Sort by most recent
+
+    // 3. Summarize important details
+    const conversationSummary = conversations.length
+      ? conversations
+          .map(
+            (conv) =>
+              `${new Date(conv.date).toDateString()}: ${
+                conv.checkInDetails.get("note") || "No details available"
+              }`
+          )
+          .join("\n")
+      : "No recent conversations found.";
+
+    const birthday = contact.birthday
+      ? `Month: ${contact.birthday.month}, Day: ${contact.birthday.day}`
+      : "No birthday on file.";
+
+    const importantEventsSummary = contact.importantEvents.length
+      ? contact.importantEvents
+          .map(
+            (event) =>
+              `${new Date(event.eventDate).toDateString()}: ${event.eventName}`
+          )
+          .join("\n")
+      : "No important events on file.";
+
+    const lastCheckInDate = contact.lastCheckInDate
+      ? new Date(contact.lastCheckInDate).toDateString()
+      : "No prior check-ins.";
+
+    // 4. Prepare the prompt for the LLM
+    const prompt = `
+      Generate personalized insights for the user about their contact ${contact.name}.
+      Consider the following information:
+
+      - Relationship: ${contact.relationship}
+      - Birthday: ${birthday}
+      - Last Check-In Date: ${lastCheckInDate}
+      - Important Events:
+        ${importantEventsSummary}
+      - Recent Conversations:
+        ${conversationSummary}
+
+      Ensure each insight is a separate bullet point and keep the language concise and user-friendly.
+    `;
+
+    // 5. Call the LLM service
+    const insights = await callLLM(prompt);
+
+    // 6. Return the insights to the client
+    res.status(200).json({
+      contact: {
+        name: contact.name,
+        relationship: contact.relationship,
+        birthday,
+        lastCheckInDate,
+        importantEvents: contact.importantEvents,
+        recentConversations: conversationSummary,
+      },
+      insights,
+    });
+  } catch (error) {
+    console.error(`Error generating contact insights: ${error.message}`);
+    res.status(500).json({ message: "Failed to generate insights" });
+  }
+};
+
+const updateLearnedAttributes = async (contactId, conversationDetails) => {
+  const contact = await Contact.findById(contactId);
+
+  // Example: Extract favorite color from the conversation
+  if (conversationDetails.includes("favorite color")) {
+    const colorMatch = conversationDetails.match(/favorite color is (\w+)/i);
+    if (colorMatch) {
+      contact.learnedAttributes.set("favoriteColor", colorMatch[1]);
+    }
+  }
+
+  await contact.save();
+};
+
 export {
   addContact,
   checkDuplicateName,
   deleteContact,
+  generateContactInsights,
   getAllContacts,
   getContact,
   logCheckIn,
