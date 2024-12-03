@@ -18,8 +18,7 @@ const getAllContacts = async (req, res) => {
 const addContact = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { name, relationship, adjustableWeight, importantEvents, birthday } =
-      req.body;
+    const { name, relationship, adjustableWeight, recurringEvents, importantEvents } = req.body;
 
     // Check for duplicate contact name using the schema method
     const isDuplicate = await Contact.isDuplicateName(userId, name);
@@ -30,7 +29,7 @@ const addContact = async (req, res) => {
     // Create and save the new contact
     const newContact = await Contact.create({
       adjustableWeight,
-      birthday,
+      recurringEvents,
       importantEvents,
       name,
       relationship,
@@ -159,7 +158,6 @@ const logCheckIn = async (req, res) => {
 
     res.status(200).json({ message });
   } catch (error) {
-    console.error(`Error logging check-in: ${error.message}`);
     res.status(500).json({ message: "Failed to log check-in" });
   }
 };
@@ -206,62 +204,71 @@ const generateContactInsights = async (req, res) => {
       .select("checkInDetails date -_id")
       .sort({ date: -1 }); // Sort by most recent
 
-    // 3. Summarize important details
+    // 3. Summarize recent conversations
     const conversationSummary = conversations.length
       ? conversations
           .map(
             (conv) =>
               `${new Date(conv.date).toDateString()}: ${
-                conv.checkInDetails.get("note") || "No details available"
+                conv.checkInDetails.note || "No details available"
               }`
           )
           .join("\n")
       : "No recent conversations found.";
 
-    const birthday = contact.birthday
-      ? `Month: ${contact.birthday.month}, Day: ${contact.birthday.day}`
-      : "No birthday on file.";
+    // 4. Extract recurring events (e.g., birthdays, anniversaries)
+    const recurringEventsSummary = contact.recurringEvents.length
+      ? contact.recurringEvents
+          .map(
+            (event) =>
+              `${event.eventName}: Month ${event.month}, Day ${event.day}`
+          )
+          .join("\n")
+      : "No recurring events on file.";
 
-    const importantEventsSummary = contact.importantEvents.length
+    // 5. Summarize fixed-date events (e.g., housewarmings)
+    const fixedEventsSummary = contact.importantEvents.length
       ? contact.importantEvents
           .map(
             (event) =>
               `${new Date(event.eventDate).toDateString()}: ${event.eventName}`
           )
           .join("\n")
-      : "No important events on file.";
+      : "No fixed events on file.";
 
+    // 6. Extract last check-in date
     const lastCheckInDate = contact.lastCheckInDate
       ? new Date(contact.lastCheckInDate).toDateString()
       : "No prior check-ins.";
 
-    // 4. Prepare the prompt for the LLM
+    // 7. Prepare the prompt for the LLM
     const prompt = `
       Generate personalized insights for the user about their contact ${contact.name}.
       Consider the following information:
 
       - Relationship: ${contact.relationship}
-      - Birthday: ${birthday}
+      - Recurring Events:
+        ${recurringEventsSummary}
+      - Fixed Events:
+        ${fixedEventsSummary}
       - Last Check-In Date: ${lastCheckInDate}
-      - Important Events:
-        ${importantEventsSummary}
       - Recent Conversations:
         ${conversationSummary}
 
       Ensure each insight is a separate bullet point and keep the language concise and user-friendly.
     `;
 
-    // 5. Call the LLM service
+    // 8. Call the LLM service
     const insights = await callLLM(prompt);
 
-    // 6. Return the insights to the client
+    // 9. Return the insights to the client
     res.status(200).json({
       contact: {
         name: contact.name,
         relationship: contact.relationship,
-        birthday,
+        recurringEvents: contact.recurringEvents,
+        fixedEvents: contact.importantEvents,
         lastCheckInDate,
-        importantEvents: contact.importantEvents,
         recentConversations: conversationSummary,
       },
       insights,
@@ -272,18 +279,37 @@ const generateContactInsights = async (req, res) => {
   }
 };
 
-const updateLearnedAttributes = async (contactId, conversationDetails) => {
-  const contact = await Contact.findById(contactId);
+// Update preferences for a contact
+const updatePreferences = async (req, res) => {
+  try {
+    const { contactId } = req.params;
+    const { preferences } = req.body; // Preferences to be updated
+    const userId = req.user._id;
 
-  // Example: Extract favorite color from the conversation
-  if (conversationDetails.includes("favorite color")) {
-    const colorMatch = conversationDetails.match(/favorite color is (\w+)/i);
-    if (colorMatch) {
-      contact.learnedAttributes.set("favoriteColor", colorMatch[1]);
+    // Find the contact by ID and ensure it belongs to the user
+    const contact = await Contact.findOne({ _id: contactId, userId });
+    if (!contact) {
+      return res.status(404).json({ message: "Contact not found" });
     }
-  }
 
-  await contact.save();
+    // Use the schema method to update preferences
+    contact.updatePreferences(preferences);
+
+    // Save the updated contact
+    await contact.save();
+    console.log(
+      `[ContactController] Preferences updated successfully for contact ${contact.name}.`
+    );
+
+    res
+      .status(200)
+      .json({ message: "Preferences updated successfully.", contact });
+  } catch (error) {
+    console.error(
+      `[ContactController] Error updating preferences: ${error.message}`
+    );
+    res.status(500).json({ message: "Failed to update preferences." });
+  }
 };
 
 export {
@@ -296,4 +322,5 @@ export {
   logCheckIn,
   updateCheckIn,
   updateContact,
+  updatePreferences,
 };

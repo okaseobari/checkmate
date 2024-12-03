@@ -3,75 +3,125 @@ dotenv.config();
 
 import { redisOptions } from "../config/redisOptions.js";
 import { Worker } from "bullmq";
+import chalk from "chalk"; // Import chalk for colored logs
 import Conversation from "../models/ConversationModel.js";
 import { getEmbeddings } from "../services/LLMService.js";
 
 // Helper function to format logs with a consistent style
-const logWithTimestamp = (message, jobId = "") => {
+const logWithTimestamp = (message, jobId = "", logType = "info") => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] [Worker: embedding] [Job ${jobId}] ${message}`);
+  const baseLog = `[${timestamp}] [Worker: embedding] [Job ${jobId}]`;
+  switch (logType) {
+    case "info":
+      console.log(chalk.blue(`${baseLog} ${message}`));
+      break;
+    case "success":
+      console.log(chalk.green(`${baseLog} ${message}`));
+      break;
+    case "error":
+      console.log(chalk.red(`${baseLog} ${message}`));
+      break;
+    case "warning":
+      console.log(chalk.yellow(`${baseLog} ${message}`));
+      break;
+    default:
+      console.log(`${baseLog} ${message}`);
+  }
 };
 
 // Worker to process embedding jobs
 const embeddingWorker = new Worker(
   "embeddingQueue",
   async (job) => {
-    const { conversationId } = job.data;
+    const { conversation } = job.data;
+    const { _id: conversationId } = conversation;
+
     logWithTimestamp(
-      `Started processing for conversation ${conversationId}`,
-      job.id
+      `Started processing embeddings for conversation ${conversationId}`,
+      job.id,
+      "info"
     );
 
     try {
       // Fetch the conversation from the database
-      const conversation = await Conversation.findOne({ _id: conversationId });
+      const conversationRecord = await Conversation.findOne({
+        _id: conversationId,
+      });
 
-      if (!conversation) {
-        throw new Error(`Conversation with ID ${conversationId} not found`);
+      if (!conversationRecord) {
+        const errorMessage = `Conversation with ID ${conversationId} not found`;
+        logWithTimestamp(errorMessage, job.id, "error");
+        throw new Error(errorMessage);
       }
 
-      if (conversation.embeddings && conversation.embeddings.length > 0) {
+      if (
+        conversationRecord.embeddings &&
+        conversationRecord.embeddings.length > 0
+      ) {
         logWithTimestamp(
           `Embeddings already exist for conversation ${conversationId}`,
-          job.id
+          job.id,
+          "warning"
         );
         return;
       }
 
       // Prepare the details for embedding generation
-      const formattedDetails = JSON.stringify(conversation.checkInDetails);
+      const formattedDetails = JSON.stringify(
+        conversationRecord.checkInDetails
+      );
+      logWithTimestamp(
+        `Generating embeddings for conversation ${conversationId}`,
+        job.id,
+        "info"
+      );
       const embeddings = await getEmbeddings(formattedDetails);
 
       if (!embeddings || embeddings.length === 0) {
-        throw new Error("Failed to generate embeddings");
+        const errorMessage = `Failed to generate embeddings for conversation ${conversationId}`;
+        logWithTimestamp(errorMessage, job.id, "error");
+        throw new Error(errorMessage);
       }
 
       // Save the embeddings to the conversation
-      conversation.embeddings = embeddings;
-      await conversation.save();
+      conversationRecord.embeddings = embeddings;
+      await conversationRecord.save();
 
       logWithTimestamp(
         `Embeddings generated and saved successfully for conversation ${conversationId}`,
-        job.id
+        job.id,
+        "success"
       );
     } catch (error) {
-      logWithTimestamp(`Failed: ${error.message}`, job.id);
+      logWithTimestamp(`Failed: ${error.message}`, job.id, "error");
       throw error; // Ensure the job is retried if it fails
     }
   },
   {
     connection: redisOptions,
-    settings: { retryProcessDelay: 5000 },
+    settings: { retryProcessDelay: 5000 }, // Retry delay for failed jobs
   }
 );
 
-// Monitor job events with cleaner logs
+// Worker lifecycle event listeners with enhanced logging
+embeddingWorker.on("waiting", (jobId) => {
+  logWithTimestamp(`Job is waiting: ${jobId}`, "", "info");
+});
+
+embeddingWorker.on("active", (job) => {
+  logWithTimestamp(`Job is now active: ${job.id}`, "", "info");
+});
+
+embeddingWorker.on("stalled", (job) => {
+  logWithTimestamp(`Job is stalled: ${job.id}`, "", "warning");
+});
+
 embeddingWorker.on("completed", (job) => {
-  logWithTimestamp("Completed successfully", job.id);
+  logWithTimestamp(`Job completed successfully`, job.id, "success");
 });
 
 embeddingWorker.on("failed", (job, err) => {
-  logWithTimestamp(`Failed: ${err.message}`, job.id);
+  logWithTimestamp(`Job failed: ${err.message}`, job.id, "error");
 });
 
 // Graceful shutdown handling with clear logs
@@ -79,7 +129,11 @@ process.on("SIGTERM", handleShutdown);
 process.on("SIGINT", handleShutdown);
 
 async function handleShutdown() {
-  console.log("Shutdown signal received: closing embedding worker...");
+  logWithTimestamp(
+    "Shutdown signal received: closing embedding worker...",
+    "",
+    "info"
+  );
   await embeddingWorker.close();
   process.exit(0);
 }

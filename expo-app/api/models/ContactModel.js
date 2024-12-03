@@ -19,10 +19,13 @@ const contactSchema = new mongoose.Schema({
     type: Number,
     default: 1,
   },
-  birthday: {
-    month: { type: Number, min: 1, max: 12 }, // Month without year
-    day: { type: Number, min: 1, max: 31 },   // Day of the month
-  },
+  recurringEvents: [
+    {
+      eventName: { type: String, required: true }, // E.g., "Birthday", "Anniversary"
+      month: { type: Number, min: 1, max: 12, required: true },
+      day: { type: Number, min: 1, max: 31, required: true },
+    },
+  ],
   importantEvents: [
     {
       eventName: { type: String },
@@ -33,11 +36,7 @@ const contactSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
-  learnedAttributes: {
-    type: Map,
-    of: String,
-    default: {}
-  },
+  preferences: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
 });
 
 // Schema methods
@@ -71,6 +70,38 @@ contactSchema.methods.removeImportantEvent = async function (eventName) {
 // Method to update a contact’s details
 contactSchema.methods.updateContactDetails = async function (updateData) {
   Object.assign(this, updateData);
+  return this.save();
+};
+
+contactSchema.methods.updatePreferences = function (newPreferences) {
+  // Ensure preferences is initialized
+  if (!this.preferences) {
+    this.preferences = new Map();
+  }
+
+  // Merge new preferences into existing ones
+  for (const [key, value] of Object.entries(newPreferences)) {
+    if (this.preferences.has(key)) {
+      const existingValue = this.preferences.get(key);
+
+      // Merge arrays (deduplicate) if the values are arrays
+      if (Array.isArray(existingValue) && Array.isArray(value)) {
+        this.preferences.set(key, [...new Set([...existingValue, ...value])]);
+      }
+      // Handle object merging
+      else if (typeof existingValue === "object" && typeof value === "object") {
+        this.preferences.set(key, { ...existingValue, ...value });
+      }
+      // For primitive values, merge only if the new value is different
+      else if (existingValue !== value) {
+        this.preferences.set(key, value);
+      }
+    } else {
+      // Add new key-value pairs
+      this.preferences.set(key, value);
+    }
+  }
+
   return this.save();
 };
 

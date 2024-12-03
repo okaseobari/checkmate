@@ -1,5 +1,8 @@
 import Conversation from "../models/ConversationModel.js";
-import { embeddingQueue } from "../services/queueService.js";
+import {
+  embeddingQueue,
+  preferenceExtractionQueue,
+} from "../services/queueService.js";
 import { generateCheckInNotificationMessage } from "../utils/checkInMessageGenerator.js";
 
 // Add a conversation
@@ -15,9 +18,12 @@ const addConversation = async (req, res) => {
       checkInDetails,
     });
 
-    // Trigger embedding generation (assuming this is handled via a worker queue)
-    await embeddingQueue.add("generateEmbeddings", {
-      conversationId: newConversation._id,
+    embeddingQueue.add("generateEmbeddings", {
+      conversation: newConversation,
+    });
+
+    preferenceExtractionQueue.add("extractPreferences", {
+      conversation: newConversation,
     });
 
     res.status(201).json({ message: "Conversation added successfully" });

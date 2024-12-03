@@ -34,24 +34,26 @@ describe("Scheduler Tests", () => {
     scheduleManager = new Scheduler(userSettings);
   });
 
-  test("schedules important event check-ins correctly", () => {
-    const currentDate = new Date();
-
-    // Ensure the event date is within the current month
-    const eventDate1 = new Date(currentDate);
-    eventDate1.setDate(currentDate.getDate() + 3);
-
+  test("schedules recurring events like birthdays correctly", () => {
     const contact = {
       _id: 1,
       name: "John",
       relationship: RELATIONSHIP_TYPES.FRIEND,
-      importantEvents: [{ eventName: "Birthday", eventDate: eventDate1 }],
+      recurringEvents: [
+        {
+          eventName: "Birthday",
+          month: new Date().getMonth() + 1,
+          day: new Date().getDate() + 3,
+        },
+      ],
     };
 
     scheduleManager.addContact(contact);
     const generatedSchedule = scheduleManager.generateSchedule();
 
-    const formattedEventDate = formatDateToLocal(eventDate1);
+    const formattedEventDate = formatDateToLocal(
+      new Date(new Date().setDate(new Date().getDate() + 3))
+    );
     const birthdayCheckIn = generatedSchedule.find(
       (checkIn) =>
         checkIn.date === formattedEventDate &&

@@ -5,3 +5,7 @@ import { redisOptions } from "../config/redisOptions.js"; // Ensure you have Red
 export const embeddingQueue = new Queue("embeddingQueue", {
   connection: redisOptions,
 });
+
+export const preferenceExtractionQueue = new Queue("preferenceExtractionQueue", {
+  connection: redisOptions,
+});

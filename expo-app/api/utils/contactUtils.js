@@ -21,10 +21,36 @@ export const fetchContacts = async ({ userId, filters = {}, fields = [] }) => {
   console.log("[fetchContacts] Resolving contacts...");
 
   // Always include the "name" field in the query
-  const projection = [...fields, "name"]; // Ensure "name" is always included
+  const projection = Array.from(new Set([...fields, "name"])); // Ensure "name" is always included
+
+  //TODO should we handle this at query parsing
+  // Convert filters to case-insensitive if they are strings
+  const caseInsensitiveFilters = Object.fromEntries(
+    Object.entries(filters).map(([key, value]) => {
+      if (typeof value === "string") {
+        return [key, { $regex: new RegExp(value, "i") }];
+      }
+      if (Array.isArray(value)) {
+        // Convert array filters to case-insensitive regex
+        return [
+          key,
+          {
+            $in: value.map((val) =>
+              typeof val === "string" ? new RegExp(val, "i") : val
+            ),
+          },
+        ];
+      }
+      return [key, value]; // Keep other types of filters as is
+    })
+  );
 
   // Build the query
-  const query = { userId, ...filters };
+  const query = { userId, ...caseInsensitiveFilters };
+
+  console.log(
+    chalk.blue("[fetchContacts] Query:", JSON.stringify(query, null, 2))
+  );
 
   try {
     const contacts = await Contact.find(query)

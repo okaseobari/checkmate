@@ -8,6 +8,7 @@ import {
   getContact,
   logCheckIn,
   updateContact,
+  updatePreferences
 } from "../controllers/ContactController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -37,5 +38,8 @@ contactRouter.put("/:contactId/log-checkin", logCheckIn);
 
 // Route for generating contact insights
 contactRouter.get("/:contactId/insights", generateContactInsights); // Generate insights for a contact
+
+// Route for updating preferences of a contact
+contactRouter.patch("/:contactId/preferences", updatePreferences); // Update preferences for a contact
 
 export default contactRouter;

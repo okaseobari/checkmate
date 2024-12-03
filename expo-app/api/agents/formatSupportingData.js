@@ -7,6 +7,7 @@ import chalk from "chalk";
  * - Groups conversations by contact ID for clarity and token efficiency.
  * - Groups schedules by contact ID for better traceability.
  * - Formats each contact's details, attaching relevant conversations and schedule entries.
+ * - Differentiates recurring events (e.g., birthdays, anniversaries) and fixed-date events.
  * - Returns a structured object that includes:
  *    - A list of formatted contacts.
  *    - A summary with total counts of contacts, conversations, and schedules.
@@ -22,7 +23,7 @@ import chalk from "chalk";
  * @param {Array} data.scheduleDetails - List of schedule entries with their details.
  *
  * @returns {Object} - The formatted data for LLM, including:
- * - `contacts`: List of contacts with their conversations and schedules.
+ * - `contacts`: List of contacts with their conversations, schedules, and events.
  * - `summary`: Total number of contacts, conversations, and schedules.
  * - `content`: Full content of contacts, conversations, and schedules if available.
  */
@@ -80,22 +81,34 @@ export const formatSupportingData = ({
     return acc;
   }, {});
 
-  // Format contact details and attach grouped conversations and schedules
+  // Format contact details and attach grouped conversations, schedules, and events
   console.log(
     chalk.blue("[formatSupportingData] Formatting contact details...")
   );
   const formattedData = contactDetails.map((contact) => {
     const contactId = contact._id.toString();
 
+    // Extract recurring events
+    const recurringEvents = (contact.recurringEvents || []).map((event) => ({
+      eventName: event.eventName,
+      month: event.month,
+      day: event.day,
+    }));
+
+    // Extract fixed events
+    const fixedEvents = (contact.importantEvents || []).map((event) => ({
+      eventName: event.eventName,
+      eventDate: event.eventDate.toISOString(),
+    }));
+
     return {
       id: contactId,
       name: contact.name,
-      birthday: contact.birthday
-        ? { month: contact.birthday.month, day: contact.birthday.day }
-        : null,
       lastCheckInDate: contact.lastCheckInDate
         ? contact.lastCheckInDate.toISOString()
         : null,
+      recurringEvents,
+      fixedEvents,
       conversations: groupedConversations[contactId] || [],
       schedules: groupedSchedules[contactId] || [],
     };

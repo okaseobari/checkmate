@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"; // For storing the token securely
-import { useNavigation } from "@react-navigation/native"; // For navigation
 import axios from "axios";
 import React, { useState } from "react";
 import {
@@ -16,7 +15,6 @@ const LoginScreen = () => {
   const [password, setPassword] = useState("1234");
   const [error, setError] = useState(null);
   const [isResetting, setIsResetting] = useState(false);
-  const navigation = useNavigation(); // React Navigation hook for navigation
 
   const handleLogin = async () => {
     try {

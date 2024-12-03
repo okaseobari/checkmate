@@ -121,12 +121,8 @@ class Scheduler {
     const newSchedule = [];
 
     this.contacts.forEach((contact) => {
-      this.addImportantEvents(
-        contact,
-        currentDate,
-        totalDays,
-        newSchedule
-      );
+      this.addRecurringEvents(contact, currentDate, totalDays, newSchedule);
+      this.addImportantEvents(contact, currentDate, totalDays, newSchedule);
     });
 
     this.contacts.forEach((contact) => {
@@ -143,6 +139,28 @@ class Scheduler {
       (a, b) => new Date(a.date) - new Date(b.date)
     );
     return this.schedule;
+  }
+
+  // Helper function to schedule recurring events for a contact
+  addRecurringEvents(contact, currentDate, totalDays, schedule) {
+    (contact.recurringEvents || []).forEach((event) => {
+      const recurringEventDate = new Date(
+        currentDate.getFullYear(),
+        event.month - 1,
+        event.day
+      );
+
+      if (
+        this.isEventWithinPeriod(recurringEventDate, currentDate, totalDays)
+      ) {
+        schedule.push({
+          contactId: contact._id,
+          name: contact.name,
+          date: recurringEventDate.toISOString().split("T")[0],
+          note: `${event.eventName} Check-in`,
+        });
+      }
+    });
   }
 
   // Helper function to schedule important events for a contact

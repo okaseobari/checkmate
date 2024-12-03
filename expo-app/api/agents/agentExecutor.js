@@ -59,11 +59,13 @@ export const agentExecutor = async (userPrompt, userId) => {
     );
 
     // Step 4: Construct the final prompt and send to LLM
-    const finalPrompt = `${userPrompt}\n\nSupporting Data:\n${JSON.stringify(
-      supportingData,
-      null,
-      2
-    )}`;
+     // Step 4: Construct the final prompt and send to LLM
+     const today = new Date().toISOString().split("T")[0]; // Get today's date in YYYY-MM-DD format
+     const finalPrompt = `Date: ${today}\n\n${userPrompt}\n\nSupporting Data:\n${JSON.stringify(
+       supportingData,
+       null,
+       2
+     )}`;
     console.log(chalk.blue.bold("[agentExecutor] Sending prompt to LLM..."));
     const llmResponse = await callLLM(finalPrompt);
 

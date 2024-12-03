@@ -5,23 +5,27 @@ export const schemaRegistry = {
       userId: "ObjectId (Reference to the User collection)",
       name: "String (Name of the contact)",
       relationship: "String (Relationship type: Family, Friend, etc.)",
-      birthday: {
-        description: "Birthday details of the contact.",
-        fields: {
-          month: "Number (Month of the birthday, 1-12)",
-          day: "Number (Day of the birthday, 1-31)",
+      recurringEvents: [
+        {
+          description: "Recurring events such as birthdays or anniversaries.",
+          fields: {
+            eventName:
+              "String (Name of the event, e.g., Birthday, Anniversary)",
+            month: "Number (Month of the event, 1-12)",
+            day: "Number (Day of the event, 1-31)",
+          },
         },
-      },
-      adjustableWeight: "Number (Weight assigned to prioritize check-ins)",
+      ],
       importantEvents: [
         {
-          description: "Significant events related to the contact.",
+          description: "Significant one-time events related to the contact.",
           fields: {
             eventName: "String (Name of the event)",
             eventDate: "Date (When the event occurs)",
           },
         },
       ],
+      adjustableWeight: "Number (Weight assigned to prioritize check-ins)",
       lastCheckInDate:
         "Date (The last time the user checked in with this contact)",
     },

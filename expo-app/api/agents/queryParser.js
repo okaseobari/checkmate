@@ -41,8 +41,8 @@ Response:
   "dependencies": [
     {
       "collection": "contacts",
-      "fields": ["name", "birthday"],
-      "filters": { "name": "Ruth" },
+      "fields": ["name", "recurringEvents"],
+      "filters": { "name": "Ruth", "recurringEvents.eventName": "Birthday" },
       "limit": 1
     }
   ]
@@ -54,7 +54,7 @@ Response:
   "dependencies": [
     {
       "collection": "contacts",
-      "fields": ["name", "importantEvents"]
+      "fields": ["name", "importantEvents", "recurringEvents"]
     },
     {
       "collection": "schedule",
